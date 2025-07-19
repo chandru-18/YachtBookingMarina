@@ -1,37 +1,28 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>Register - Yacht Marina Booking</title>
-  <link rel="stylesheet" href="/style.css">
+  <title>Register</title>
+  <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <header>
-    <h1>Yacht Marina Booking</h1>
-    <p><a href="/">🏠 Back to Home</a></p>
-  </header>
-
   <div class="form-container">
-    <h2>📝 Create an Account</h2>
-    <form action="/register" method="POST" class="styled-form">
-
-      <label for="name">Name</label>
-      <input name="name" id="name" type="text" placeholder="Enter your full name" required>
-
-      <label for="email">Email</label>
-      <input name="email" id="email" type="email" placeholder="Enter your email" required>
-
-      <label for="password">Password</label>
-      <input name="password" id="password" type="password" placeholder="Create a password" required>
-
+    <h2>New User Register</h2>
+    <% if (success && success.length) { %>
+      <script>alert("<%= success %>");</script>
+    <% } %>
+    <% if (error && error.length) { %>
+      <div class="flash-error"><%= error %></div>
+    <% } %>
+    <form method="POST" action="/register">
+      <label>Name</label>
+      <input type="text" name="name" required/>
+      <label>Email</label>
+      <input type="email" name="email" required/>
+      <label>Password</label>
+      <input type="password" name="password" required/>
       <button type="submit">Register</button>
     </form>
-
-    <p>Already have an account? <a href="/login">Login here</a></p>
+    <a href="/login">Already have an account?</a>
   </div>
-
-  <footer>
-    <p>© <%= new Date().getFullYear() %> Yacht Marina Booking</p>
-  </footer>
 </body>
 </html>

@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <title>Admin Panel – Yacht Booking</title>
   <link rel="stylesheet" href="/style.css" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 </head>
 <body>
 
@@ -13,6 +14,7 @@
     <p><a href="/dashboard">← Back to Dashboard</a> | <a href="/logout">Logout</a></p>
   </header>
 
+  <!-- Flash Messages -->
   <% if (success && success.length > 0) { %>
     <div class="flash-success"><%= success %></div>
   <% } %>
@@ -84,5 +86,17 @@
   <footer>
     <p>© <%= new Date().getFullYear() %> Yacht Marina Booking | Admin Panel</p>
   </footer>
+
+  <!-- Realtime Booking Notification via Socket.IO -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    socket.on('newBooking', (data) => {
+      const audio = new Audio('/notify.mp3');
+      audio.play();
+      alert(`🛥️ New Booking:\n\nBoat: ${data.boat}\nDate: ${data.date}\nUser: ${data.user}`);
+    });
+  </script>
+
 </body>
 </html>

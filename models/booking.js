@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const bookingSchema = new mongoose.Schema({
   boat: String,
-  date: String, // For best practice, use Date type and format in code
+  date: String, // for simplicity; in production, use type: Date
   hours: Number,
   persons: Number,
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
