@@ -1,0 +1,351 @@
+/* ===================================
+   General Body & Font
+=================================== */
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #74ebd5 0%, #acb6e5 100%);
+  color: #333;
+  margin: 0;
+  min-height: 100vh;
+  padding: 0;
+}
+
+/* ===================================
+   Header
+=================================== */
+header {
+  background: linear-gradient(90deg, #003366 60%, #007acc 100%);
+  color: #fff;
+  padding: 28px 30px;
+  text-align: center;
+  font-size: 2.2rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  margin-bottom: 30px;
+  border-bottom-left-radius: 18px;
+  border-bottom-right-radius: 18px;
+  box-shadow: 0 2px 28px rgba(0, 62, 122, 0.09);
+  animation: fadeInDown 1s ease forwards;
+}
+
+@keyframes fadeInDown {
+  0%   { opacity: 0; transform: translateY(-35px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* ===================================
+   Forms: Login / Register / Booking
+=================================== */
+.form-container,
+.main-content,
+form {
+  background: rgba(255, 255, 255, 0.97);
+  max-width: 420px;
+  margin: 45px auto;
+  padding: 30px 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 22px 0 rgba(0, 86, 160, 0.13);
+  animation: fadeIn 1.2s ease;
+  position: relative;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.styled-form label,
+.form-container label {
+  display: block;
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: #2977cc;
+  margin: 9px 0 3px 1px;
+}
+
+.styled-form input,
+.styled-form select,
+.form-container input,
+.form-container select {
+  width: 100%;
+  padding: 13px 15px;
+  margin-bottom: 13px;
+  border-radius: 8px;
+  border: 2px solid #c1d7f0;
+  outline: none;
+  font-size: 1rem;
+  background: #f8fcff;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.styled-form input:focus,
+.styled-form select:focus,
+.form-container input:focus,
+.form-container select:focus {
+  border-color: #2977cc;
+  box-shadow: 0 0 11px rgba(182, 224, 254, 0.6);
+}
+
+.styled-form button,
+.form-container button,
+button,
+.btn-save {
+  background: linear-gradient(90deg, #017bcc, #24a3f1);
+  color: #fff;
+  padding: 15px 0;
+  width: 100%;
+  font-weight: 700;
+  font-size: 1.15rem;
+  border: none;
+  border-radius: 9px;
+  margin-top: 8px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  letter-spacing: 0.06em;
+  box-shadow: 0 8px 13px rgba(0, 122, 204, 0.11);
+  transition: background 0.25s, transform 0.18s;
+}
+
+.styled-form button:hover,
+.form-container button:hover,
+button:hover,
+.btn-save:hover {
+  background: linear-gradient(90deg, #003366, #017bcc);
+  transform: scale(1.045);
+}
+
+.form-container input[type="submit"] {
+  width: 100%;
+}
+
+.form-container a,
+.styled-form a {
+  color: #007acc;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.form-container a:hover {
+  text-decoration: underline;
+}
+
+/* ===================================
+   Booking/Dashboard Card Styling
+=================================== */
+.boat,
+.dashboard-card {
+  background: #fff;
+  padding: 22px;
+  margin: 20px auto;
+  border-radius: 14px;
+  max-width: 600px;
+  box-shadow: 0 7px 21px rgba(0, 51, 102, 0.14);
+  transition: transform 0.3s, box-shadow 0.25s;
+  border-left: 10px solid #017bcc;
+}
+
+.boat:hover,
+.dashboard-card:hover {
+  transform: translateY(-7px) scale(1.01);
+  box-shadow: 0 14px 28px rgba(0, 51, 102, 0.22);
+}
+
+/* ===================================
+   Dashboard + Admin Container
+=================================== */
+.dashboard-section,
+.admin-section {
+  background: #f1f9ff;
+  max-width: 950px;
+  margin: 30px auto;
+  border-radius: 12px;
+  box-shadow: 0 6px 34px rgba(0, 70, 140, 0.11);
+  padding: 30px 20px;
+  animation: fadeIn 1s;
+}
+
+.dashboard-section h2,
+.admin-section h2 {
+  color: #003366;
+  margin-bottom: 22px;
+}
+
+.dashboard-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+/* ===================================
+   Styled Tables
+=================================== */
+.styled-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 1rem;
+  margin-top: 12px;
+  margin-bottom: 18px;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.1);
+}
+.styled-table th,
+.styled-table td {
+  padding: 13px 10px;
+  border-bottom: 1.5px solid #dde3e9;
+  text-align: left;
+}
+.styled-table thead th {
+  background-color: #2977cc;
+  color: white;
+  text-transform: uppercase;
+}
+.styled-table tbody td {
+  background-color: #f7fbff;
+}
+.styled-table tr:nth-child(even) {
+  background: #ecf2fa;
+}
+.styled-table tr:hover {
+  background: #c1e9f7da;
+  transition: background 0.23s;
+}
+
+/* ===================================
+   Label Styling for Admin Checkboxes
+=================================== */
+.admin-section label {
+  margin-bottom: 13px;
+  font-size: 1.09rem;
+}
+
+/* ===================================
+   Light Buttons (login, logout, gallery)
+=================================== */
+.light-btn {
+  border: none;
+  border-radius: 9px;
+  padding: 12px 24px;
+  font-size: 1rem;
+  font-weight: bold;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  margin: 8px 0;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.login-btn {
+  background: linear-gradient(90deg, #e0eafc 0%, #cfdef3 100%);
+  color: #2977cc;
+}
+
+.login-btn:hover {
+  background: linear-gradient(90deg, #fafdff 0%, #b7d8f5 100%);
+  transform: scale(1.04);
+}
+
+.logout-btn {
+  background: linear-gradient(90deg, #fffbe5 0%, #ffe67c 100%);
+  color: #b27b00;
+}
+
+.logout-btn:hover {
+  background: linear-gradient(90deg, #fffde4 0%, #fbb034 100%);
+  transform: scale(1.05);
+}
+
+/* ===================================
+   Gallery Items
+=================================== */
+.gallery-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.gallery-item {
+  flex: 1 1 220px;
+  background: #ffffff;
+  margin-bottom: 20px;
+  border-radius: 12px;
+  padding: 12px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(54, 91, 130, 0.1);
+  transition: transform 0.25s ease;
+}
+
+.gallery-item img {
+  width: 100%;
+  height: 130px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.gallery-item:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 20px rgba(0, 123, 255, 0.16);
+}
+
+/* ===================================
+   Footer
+=================================== */
+footer {
+  text-align: center;
+  padding: 22px;
+  font-size: 1rem;
+  color: #fff;
+  background: #007acc;
+  margin-top: 55px;
+  border-top-left-radius: 18px;
+  border-top-right-radius: 18px;
+  box-shadow: 0 -2px 16px rgba(13, 187, 172, 0.15);
+  animation: fadeInUp 1.5s ease;
+}
+
+@keyframes fadeInUp {
+  0%   { opacity: 0; transform: translateY(30px);}
+  100% { opacity: 1; transform: translateY(0);}
+}
+
+/* ===================================
+   Responsive
+=================================== */
+@media (max-width: 700px) {
+  .admin-section,
+  .dashboard-section,
+  .form-container,
+  .main-content,
+  form {
+    padding: 14px 6px;
+    max-width: 98vw;
+  }
+
+  header {
+    font-size: 1.3rem;
+    padding: 17px 10px;
+  }
+
+  .styled-table th,
+  .styled-table td {
+    padding: 8px 5px;
+    font-size: 0.99rem;
+  }
+
+  .gallery-row {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+.status-available {
+  color: green;
+  font-weight: bold;
+}
+
+.status-unavailable {
+  color: red;
+  font-weight: bold;
+}

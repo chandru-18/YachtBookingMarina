@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Yacht Booking</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+  <header>
+    <h1>
+      Welcome to Yacht Marina Booking
+      <% if (user) { %>
+        <a href="#boatGallery" class="light-btn login-btn" style="float:right; font-size:1rem;">🖼️ Boat Gallery</a>
+      <% } %>
+    </h1>
+    <% if (user) { %>
+      <p>Hello, <%= user.name %> |
+        <a href="/dashboard">Dashboard</a> |
+        <a href="/logout">Logout</a>
+      </p>
+    <% } else { %>
+      <p><a href="/login">Login</a> | <a href="/register">Register</a></p>
+    <% } %>
+  </header>
+
+  <main>
+    <% if (user) { %>
+      <section class="form-container">
+        <h2>🚤 Book a Yacht</h2>
+        <form action="/book" method="POST" class="styled-form" id="booking-form">
+          <label for="boat-select">Boat Type</label>
+          <select name="boat" id="boat-select" required onchange="showCapacity()">
+            <% boats.forEach(boat => { %>
+              <option value="<%= boat.name %>">
+                <%= boat.display %>
+              </option>
+            <% }) %>
+          </select>
+
+          <span id="capacity-text" style="font-weight: bold; display: block; margin-top: 6px;"></span>
+
+          <label for="date">Date</label>
+          <input type="date" name="date" id="date" required>
+
+          <label for="hours">Hours</label>
+          <input type="number" name="hours" id="hours" min="1" max="12" placeholder="Hours" required>
+
+          <label for="persons">Persons</label>
+          <input type="number" name="persons" id="persons" min="1" max="20" placeholder="Number of Persons" required>
+
+          <button type="submit">✅ Book Now</button>
+        </form>
+      </section>
+
+      <script>
+        // Boat capacities object should match server config (by name)
+        const boats = {
+          "Boat 1": 15,
+          "Boat 2": 20,
+          "Boat 3": 10,
+          "Boat 4": 10
+        };
+
+        function showCapacity() {
+          const boat = document.getElementById('boat-select').value;
+          const max = boats[boat] || 20;
+          document.getElementById('capacity-text').textContent = `Max Capacity: ${max} persons`;
+          document.getElementById('persons').max = max;
+        }
+
+        document.addEventListener('DOMContentLoaded', showCapacity);
+        document.getElementById('boat-select').addEventListener('change', showCapacity);
+      </script>
+
+    <% } else { %>
+      <section class="form-container">
+        <h2>Please log in to book a yacht</h2>
+        <p><a href="/login">Login</a> or <a href="/register">Register</a> to begin your booking.</p>
+      </section>
+    <% } %>
+  </main>
+
+  <!-- Boat Gallery Modal -->
+  <section id="boatGallery" class="form-container" style="margin-top: 50px; max-width: 800px;">
+    <h3 style="text-align:center;">🖼️ Boat Gallery</h3>
+    <div class="gallery-row">
+      <div class="gallery-item">
+        <img src="/images/boat1.jpg" alt="ORYX 46 ft"><br><strong>ORYX 46 ft</strong>
+      </div>
+      <div class="gallery-item">
+        <img src="/images/boat2.jpg" alt="Majesty 56 ft"><br><strong>Majesty 56 ft</strong>
+      </div>
+      <div class="gallery-item">
+        <img src="/images/boat3.jpg" alt="Fishing/Speed Boat 31 ft"><br><strong>Fishing/Speed Boat 31 ft</strong>
+      </div>
+      <div class="gallery-item">
+        <img src="/images/boat4.jpg" alt="ORYX 36 ft"><br><strong>ORYX 36 ft</strong>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>© <%= new Date().getFullYear() %> Yacht Marina Booking Platform</p>
+  </footer>
+
+</body>
+</html>

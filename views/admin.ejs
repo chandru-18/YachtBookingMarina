@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Admin Panel – Yacht Booking</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <h1>⚙ Admin Panel</h1>
+    <p><a href="/dashboard">← Back to Dashboard</a> | <a href="/logout">Logout</a></p>
+  </header>
+
+  <% if (success && success.length > 0) { %>
+    <div class="flash-success"><%= success %></div>
+  <% } %>
+  <% if (error && error.length > 0) { %>
+    <div class="flash-error"><%= error %></div>
+  <% } %>
+
+  <!-- Boat Availability Section -->
+  <div class="admin-section">
+    <h2>🛥️ Set Boat Availability</h2>
+    <form method="POST" action="/admin/update-boats">
+      <% boats.forEach(boat => { %>
+        <label style="display: block; margin: 12px 0; font-weight: 600;">
+          <input type="checkbox" name="<%= boat.name %>" <%= boat.available ? 'checked' : '' %> />
+          <%= boat.display %>
+          <span class="<%= boat.available ? 'status-available' : 'status-unavailable' %>">
+            (<%= boat.available ? "Available" : "Unavailable" %>)
+          </span>
+        </label>
+      <% }) %>
+      <button type="submit" class="btn-save" style="margin-top: 20px;">✅ Save Changes</button>
+    </form>
+    <a href="/admin/export/csv" class="btn-save" style="margin-top:20px;display:inline-block;">⬇️ Export CSV</a>
+    <a href="/admin/export/pdf" class="btn-save" style="margin-top:20px;display:inline-block;">⬇️ Export PDF</a>
+  </div>
+
+  <!-- All Bookings Section -->
+  <div class="admin-section">
+    <h2>📋 Booking Records</h2>
+    <% if (bookings.length === 0) { %>
+      <p>No bookings found yet.</p>
+    <% } else { %>
+      <table class="styled-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Boat</th>
+            <th>Date</th>
+            <th>Hours</th>
+            <th>Persons</th>
+            <th>User Name</th>
+            <th>User Email</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% bookings.forEach((b, index) => { %>
+            <tr>
+              <td><%= index + 1 %></td>
+              <td><%= b.boat %></td>
+              <td><%= b.date %></td>
+              <td><%= b.hours %></td>
+              <td><%= b.persons %></td>
+              <td><%= b.user.name %></td>
+              <td><%= b.user.email %></td>
+              <td>
+                <form action="/admin/delete-booking/<%= b._id %>" method="POST" style="display:inline;">
+                  <button class="btn-save" onclick="return confirm('Delete this booking?')" style="padding:2px 13px;">🗑️ Delete</button>
+                </form>
+                <a href="/admin/edit-booking/<%= b._id %>" class="btn-save" style="padding:2px 13px;">✏️ Edit</a>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+  </div>
+
+  <footer>
+    <p>© <%= new Date().getFullYear() %> Yacht Marina Booking | Admin Panel</p>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard - Yacht Marina Booking</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+  <!-- Header -->
+  <header>
+    <h1>👋 Welcome, <%= user.name %>!</h1>
+    <a href="/logout" class="light-btn logout-btn" style="width: auto;">🚪 Logout</a>
+  </header>
+
+  <!-- Dashboard Container -->
+  <main class="dashboard-section">
+    <h3>📅 Your Bookings</h3>
+
+    <% if (bookings.length === 0) { %>
+      <p>No bookings yet. <a href="/">Click here</a> to book your first yacht.</p>
+    <% } else { %>
+      <div class="dashboard-grid">
+        <% bookings.forEach((b, index) => { %>
+          <div class="dashboard-card">
+            <h4>⛵ <%= b.boat %></h4>
+            <p><strong>📅 Date:</strong> <%= b.date %></p>
+            <p><strong>⏱ Hours:</strong> <%= b.hours %></p>
+            <p><strong>👥 Persons:</strong> <%= b.persons %></p>
+          </div>
+        <% }) %>
+      </div>
+      <a href="/" class="light-btn login-btn" style="width:auto; padding:12px 28px; margin-top:20px; display:inline-block;">+ Book Another Yacht</a>
+    <% } %>
+
+    <% if (user.isAdmin) { %>
+      <p style="margin-top: 30px;">
+        <a href="/admin" class="btn-save" style="width:auto;">⚙ Go to Admin Panel</a>
+      </p>
+    <% } %>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <p>© <%= new Date().getFullYear() %> Yacht Marina Booking</p>
+  </footer>
+
+</body>
+</html>

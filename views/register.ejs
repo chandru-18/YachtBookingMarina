@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Register - Yacht Marina Booking</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1>Yacht Marina Booking</h1>
+    <p><a href="/">🏠 Back to Home</a></p>
+  </header>
+
+  <div class="form-container">
+    <h2>📝 Create an Account</h2>
+    <form action="/register" method="POST" class="styled-form">
+
+      <label for="name">Name</label>
+      <input name="name" id="name" type="text" placeholder="Enter your full name" required>
+
+      <label for="email">Email</label>
+      <input name="email" id="email" type="email" placeholder="Enter your email" required>
+
+      <label for="password">Password</label>
+      <input name="password" id="password" type="password" placeholder="Create a password" required>
+
+      <button type="submit">Register</button>
+    </form>
+
+    <p>Already have an account? <a href="/login">Login here</a></p>
+  </div>
+
+  <footer>
+    <p>© <%= new Date().getFullYear() %> Yacht Marina Booking</p>
+  </footer>
+</body>
+</html>

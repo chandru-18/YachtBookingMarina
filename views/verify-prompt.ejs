@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>Email Verification Needed</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="form-container">
+    <h2>Verify Your Email</h2>
+    <p>We've sent a verification link to your email address. Please check your inbox and verify your account to proceed.</p>
+    <!-- Optionally add a resend link here if user hasn't received the email -->
+    <form action="/resend-verification" method="POST">
+      <input type="hidden" name="email" value="<%= user ? user.email : '' %>">
+      <button type="submit" class="btn-save">Resend Verification Email</button>
+    </form>
+    <a href="/logout" class="logout-btn light-btn" style="margin-top:10px;">Logout</a>
+  </div>
+</body>
+</html>
