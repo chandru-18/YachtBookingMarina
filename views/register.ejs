@@ -7,12 +7,19 @@
 <body>
   <div class="form-container">
     <h2>New User Register</h2>
+
     <% if (success && success.length) { %>
-      <script>alert("<%= success %>");</script>
+      <div class="flash-success"><%= success %></div>
+      <!-- Optionally, you can also show a direct link to re-send verification -->
+      <div style="margin-top:12px;">
+        Haven't received the email? <a href="/resend-verification?email=<%= email || '' %>">Resend verification email</a>
+      </div>
     <% } %>
+    
     <% if (error && error.length) { %>
       <div class="flash-error"><%= error %></div>
     <% } %>
+    
     <form method="POST" action="/register">
       <label>Name</label>
       <input type="text" name="name" required/>

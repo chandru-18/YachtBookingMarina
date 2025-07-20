@@ -55,6 +55,7 @@
             <th>Date</th>
             <th>Hours</th>
             <th>Persons</th>
+            <th>Phone</th>
             <th>User Name</th>
             <th>User Email</th>
             <th>Actions</th>
@@ -68,8 +69,15 @@
               <td><%= b.date %></td>
               <td><%= b.hours %></td>
               <td><%= b.persons %></td>
-              <td><%= b.user.name %></td>
-              <td><%= b.user.email %></td>
+              <td>
+                <% if (b.phoneNumber) { %>
+                  <a href="tel:<%= b.phoneNumber %>"><%= b.phoneNumber %></a>
+                <% } else { %>
+                  <span style="color:#aaa;">Not provided</span>
+                <% } %>
+              </td>
+              <td><%= b.user && b.user.name ? b.user.name : '' %></td>
+              <td><%= b.user && b.user.email ? b.user.email : '' %></td>
               <td>
                 <form action="/admin/delete-booking/<%= b._id %>" method="POST" style="display:inline;">
                   <button class="btn-save" onclick="return confirm('Delete this booking?')" style="padding:2px 13px;">🗑️ Delete</button>
@@ -89,12 +97,13 @@
 
   <!-- Realtime Booking Notification via Socket.IO -->
   <script src="/socket.io/socket.io.js"></script>
+  <audio id="notif" src="/ding.mp3" preload="auto"></audio>
   <script>
     const socket = io();
-    socket.on('newBooking', (data) => {
-      const audio = new Audio('/notify.mp3');
-      audio.play();
-      alert(`🛥️ New Booking:\n\nBoat: ${data.boat}\nDate: ${data.date}\nUser: ${data.user}`);
+    socket.on('new-booking', () => {
+      document.getElementById("notif").play();
+      // Optionally reload bookings or show a toast here
+      location.reload();
     });
   </script>
 

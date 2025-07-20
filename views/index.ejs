@@ -49,6 +49,14 @@
           <label for="persons">Persons</label>
           <input type="number" name="persons" id="persons" min="1" max="20" placeholder="Number of Persons" required>
 
+          <!-- Phone number field (new) -->
+          <label for="phoneNumber">Phone Number</label>
+          <input type="tel" name="phoneNumber" id="phoneNumber" 
+                 pattern="[0-9]{10,15}" 
+                 maxlength="15"
+                 placeholder="Enter your phone number"
+                 required>
+
           <button type="submit">✅ Book Now</button>
         </form>
       </section>
@@ -72,7 +80,6 @@
         document.addEventListener('DOMContentLoaded', showCapacity);
         document.getElementById('boat-select').addEventListener('change', showCapacity);
       </script>
-
     <% } else { %>
       <section class="form-container">
         <h2>Please log in to book a yacht</h2>
