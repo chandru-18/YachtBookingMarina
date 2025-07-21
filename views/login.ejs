@@ -13,6 +13,15 @@
 
   <div class="form-container">
     <h2>🔐 Login to Your Account</h2>
+
+    <!-- Flash messages -->
+    <% if (messages.error && messages.error.length > 0) { %>
+      <div class="message error"><%= messages.error[0] %></div>
+    <% } %>
+    <% if (messages.success && messages.success.length > 0) { %>
+      <div class="message success"><%= messages.success[0] %></div>
+    <% } %>
+
     <form action="/login" method="POST" class="styled-form">
 
       <label for="email">Email</label>

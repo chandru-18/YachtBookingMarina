@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Dashboard – Yacht Marina Booking</title>
+  <link rel="stylesheet" href="/style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+<body>
+  <header>
+    <h1>⚙ Admin Dashboard</h1>
+    <nav>
+      <a href="/dashboard">← User Dashboard</a> |
+      <a href="/">🏠 Home</a> |
+      <a href="/logout">Logout</a>
+    </nav>
+  </header>
+
+  <main style="max-width:1200px;margin:36px auto;">
+    <h2 style="margin-bottom:25px;">All Bookings</h2>
+    <% if (!bookings || bookings.length === 0) { %>
+      <div class="card" style="text-align:center;">
+        <p>No bookings found yet.</p>
+      </div>
+    <% } else { %>
+      <table class="styled-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>User Name</th>
+            <th>User Email</th>
+            <th>Boat</th>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Persons</th>
+            <th>Status</th>
+            <th>Phone</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% bookings.forEach((booking, idx) => { %>
+            <tr>
+              <td><%= idx + 1 %></td>
+              <td><%= booking.user && booking.user.name ? booking.user.name : 'Unknown' %></td>
+              <td><%= booking.user && booking.user.email ? booking.user.email : 'Unknown' %></td>
+              <td><%= booking.boat && booking.boat.name ? booking.boat.name : "Unknown Boat" %></td>
+              <td><%= booking.bookingDate ? booking.bookingDate.toLocaleDateString() : "" %></td>
+              <td><%= booking.startTime && booking.endTime ? booking.startTime + ' - ' + booking.endTime : '--' %></td>
+              <td><%= booking.numberOfPersons %></td>
+              <td><%= booking.status %></td>
+              <td>
+                <% if (booking.phoneNumber) { %>
+                  <a href="tel:<%= booking.phoneNumber %>"><%= booking.phoneNumber %></a>
+                <% } else { %>
+                  <span style="color:#aaa;">Not provided</span>
+                <% } %>
+              </td>
+              <td>
+                <!-- Delete button -->
+                <form action="/admin/delete-booking/<%= booking._id %>" method="POST" style="display:inline;">
+                  <button class="btn-save" onclick="return confirm('Delete this booking?')" style="padding:2px 13px;">🗑️ Delete</button>
+                </form>
+                <!-- Edit button -->
+                <a href="/admin/edit-booking/<%= booking._id %>" class="btn-save" style="padding:2px 13px;">✏️ Edit</a>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+  </main>
+
+  <footer>
+    <p>© <%= new Date().getFullYear() %> Yacht Marina Booking | Admin Panel</p>
+  </footer>
+</body>
+</html>

@@ -13,8 +13,7 @@ const methodOverride = require('method-override');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ===== Mongoose Models =====
-
+// ====== Models =======
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
@@ -53,8 +52,7 @@ const bookingSchema = new mongoose.Schema({
 });
 const Booking = mongoose.model('Booking', bookingSchema);
 
-// ===== Connect MongoDB, sync boats =====
-
+// ===== MongoDB ======
 mongoose.connect(process.env.MONGO_URI)
   .then(() => {
     console.log('MongoDB connected successfully');
@@ -69,26 +67,23 @@ async function syncDefaultBoats() {
     { name: "Family Fun", display: "Pontoon Boat", maxPersons: 8, pricePerHour: 200, imageUrl: "/images/family_fun.jpg" },
     { name: "Sail Dream", display: "Sailboat", maxPersons: 4, pricePerHour: 250, imageUrl: "/images/sail_dream.jpg" }
   ];
-  try {
-    for (const boatData of defaultBoats) {
-      await Boat.findOneAndUpdate(
-        { name: boatData.name },
-        { $set: boatData },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
-      );
-    }
-    console.log('Default boats synced with database.');
-  } catch (error) {
-    console.error('Error syncing default boats:', error);
+  for (const boatData of defaultBoats) {
+    await Boat.findOneAndUpdate(
+      { name: boatData.name },
+      { $set: boatData },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
   }
+  console.log('Default boats synced with database.');
 }
 
-// ===== Middleware =====
-
+// ===== Middleware Order =====
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(methodOverride('_method'));
+
+// --- session FIRST, then flash, then res.locals ---
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
@@ -105,6 +100,7 @@ app.use((req, res, next) => {
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
+// ===== Email ======
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -113,8 +109,7 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-// ===== Authentication Middleware =====
-
+// ===== Auth Middleware =====
 const isAuthenticated = (req, res, next) => {
   if (req.session.userId) return next();
   req.flash('error', 'Please log in to access this page.');
@@ -126,9 +121,9 @@ const isAdmin = (req, res, next) => {
   res.redirect('/');
 };
 
-// ======== Routes ========
+// ===== Routes =====
 
-// --- Home Page ---
+// Home Page
 app.get('/', async (req, res) => {
   try {
     const boats = await Boat.find({});
@@ -139,7 +134,7 @@ app.get('/', async (req, res) => {
   }
 });
 
-// --- User Registration ---
+// User Registration
 app.get('/register', (req, res) => res.render('register'));
 app.post('/register', async (req, res) => {
   try {
@@ -158,7 +153,7 @@ app.post('/register', async (req, res) => {
   }
 });
 
-// --- Login/Logout ---
+// Login/Logout
 app.get('/login', (req, res) => res.render('login'));
 app.post('/login', async (req, res) => {
   const { email, password } = req.body;
@@ -170,7 +165,7 @@ app.post('/login', async (req, res) => {
   req.session.userId = user._id;
   req.session.user = { id: user._id, name: user.name, email: user.email, isAdmin: user.isAdmin };
   req.flash('success', 'Logged in successfully!');
-  res.redirect('/');
+  res.redirect('/dashboard');
 });
 app.get('/logout', (req, res) => {
   req.session.destroy(err => {
@@ -181,7 +176,7 @@ app.get('/logout', (req, res) => {
   });
 });
 
-// === Forgot Password (with /forgot!) ===
+// Forgot Password (/forgot)
 app.get('/forgot', (req, res) => res.render('forgot'));
 app.post('/forgot', async (req, res) => {
   try {
@@ -210,7 +205,6 @@ app.post('/forgot', async (req, res) => {
     res.redirect('/forgot');
   }
 });
-
 app.get('/reset-password/:token', async (req, res) => {
   try {
     const user = await User.findOne({
@@ -253,7 +247,21 @@ app.post('/reset-password/:token', async (req, res) => {
   }
 });
 
-// --- Booking Example (Add your own as needed) ---
+// User Dashboard (Safe)
+app.get('/dashboard', isAuthenticated, async (req, res) => {
+  try {
+    const bookings = await Booking.find({ user: req.session.userId }).populate('boat');
+    res.render('dashboard', {
+      user: req.session.user,
+      bookings: bookings
+    });
+  } catch (err) {
+    req.flash('error', 'Unable to load dashboard.');
+    res.redirect('/');
+  }
+});
+
+// Bookings
 app.get('/book/:boatId', isAuthenticated, async (req, res) => {
   const boat = await Boat.findById(req.params.boatId);
   if (!boat) {
@@ -270,7 +278,6 @@ app.post('/book', isAuthenticated, async (req, res) => {
       req.flash('error', 'Boat not found for booking.');
       return res.redirect('/');
     }
-    // Basic price calculation
     const startHour = parseInt(startTime.split(':')[0]);
     const endHour = parseInt(endTime.split(':')[0]);
     const durationHours = endHour - startHour;
@@ -303,14 +310,21 @@ app.get('/profile', isAuthenticated, (req, res) => {
   res.render('profile', { user: req.session.user });
 });
 
-// Admin Dashboard (Simple Example)
+// --- Admin ---
+
+// /admin: redirect to dashboard
+app.get('/admin', (req, res) => {
+  res.redirect('/admin/dashboard');
+});
+
+// Admin Dashboard
 app.get('/admin/dashboard', isAuthenticated, isAdmin, async (req, res) => {
   const users = await User.find({});
   const bookings = await Booking.find({}).populate('user').populate('boat').sort({ createdAt: -1 });
   res.render('admin/dashboard', { users, bookings });
 });
 
-// --- Start Server ---
+// --- SERVER START ---
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
 });

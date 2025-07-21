@@ -2,48 +2,48 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Dashboard - Yacht Marina Booking</title>
+  <title>User Dashboard – Yacht Marina Booking</title>
   <link rel="stylesheet" href="/style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 </head>
 <body>
-
-  <!-- Header -->
   <header>
-    <h1>👋 Welcome, <%= user.name %>!</h1>
-    <a href="/logout" class="light-btn logout-btn" style="width: auto;">🚪 Logout</a>
+    <h1>👋 Welcome, <%= user && user.name ? user.name : "Guest" %>!</h1>
+    <a href="/logout" class="btn btn-danger logout-btn" style="width:auto;float:right;margin-left:12px;">🚪 Logout</a>
+    <a href="/" class="btn btn-primary" style="width:auto;float:right;">🏠 Home</a>
   </header>
 
-  <!-- Dashboard Container -->
-  <main class="dashboard-section">
-    <h3>📅 Your Bookings</h3>
-
-    <% if (bookings.length === 0) { %>
-      <p>No bookings yet. <a href="/">Click here</a> to book your first yacht.</p>
-    <% } else { %>
-      <div class="dashboard-grid">
-        <% bookings.forEach((b, index) => { %>
-          <div class="dashboard-card">
-            <h4>⛵ <%= b.boat %></h4>
-            <p><strong>📅 Date:</strong> <%= b.date %></p>
-            <p><strong>⏱ Hours:</strong> <%= b.hours %></p>
-            <p><strong>👥 Persons:</strong> <%= b.persons %></p>
+  <main style="max-width:1000px;margin:40px auto;padding:16px;">
+    <h2>📅 Your Bookings</h2>
+    <% if (bookings && bookings.length === 0) { %>
+      <div class="card" style="text-align:center;">
+        <p>No bookings yet. <a href="/">Click here</a> to book your first yacht.</p>
+      </div>
+    <% } else if (bookings && bookings.length > 0) { %>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(320px,1fr));gap:28px;">
+        <% bookings.forEach(b => { %>
+          <div class="card" style="padding:20px;">
+            <h3>⛵ <strong><%= b.boat && b.boat.name ? b.boat.name : 'Unknown Boat' %></strong></h3>
+            <p><strong>📅 Date:</strong> <%= b.bookingDate ? b.bookingDate.toLocaleDateString() : '--' %></p>
+            <p><strong>⏱ Time:</strong> <%= b.startTime && b.endTime ? b.startTime + " - " + b.endTime : '--' %></p>
+            <p><strong>👥 Persons:</strong> <%= b.numberOfPersons %></p>
+            <p><strong>💵 Total Price:</strong> <%= b.totalPrice ? "₹" + b.totalPrice : "--" %></p>
+            <p><strong>Status:</strong> <%= b.status %></p>
           </div>
         <% }) %>
       </div>
-      <a href="/" class="light-btn login-btn" style="width:auto; padding:12px 28px; margin-top:20px; display:inline-block;">+ Book Another Yacht</a>
+      <a href="/" class="btn btn-success" style="margin-top:30px;display:inline-block;">+ Book Another Yacht</a>
     <% } %>
 
-    <% if (user.isAdmin) { %>
-      <p style="margin-top: 30px;">
-        <a href="/admin" class="btn-save" style="width:auto;">⚙ Go to Admin Panel</a>
-      </p>
+    <% if (user && user.isAdmin) { %>
+      <div style="margin-top: 35px; text-align:center;">
+        <a href="/admin" class="btn btn-primary" style="width:auto;">⚙ Go to Admin Panel</a>
+      </div>
     <% } %>
   </main>
 
-  <!-- Footer -->
   <footer>
-    <p>© <%= new Date().getFullYear() %> Yacht Marina Booking</p>
+    <p style="text-align:center;">© <%= new Date().getFullYear() %> Yacht Marina Booking</p>
   </footer>
-
 </body>
 </html>

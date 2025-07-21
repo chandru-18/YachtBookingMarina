@@ -11,15 +11,18 @@
   <!-- Header -->
   <header>
     <h1>⚙ Admin Panel</h1>
-    <p><a href="/dashboard">← Back to Dashboard</a> | <a href="/logout">Logout</a></p>
+    <p>
+      <a href="/dashboard">← Back to Dashboard</a> | 
+      <a href="/logout">Logout</a>
+    </p>
   </header>
 
   <!-- Flash Messages -->
-  <% if (success && success.length > 0) { %>
-    <div class="flash-success"><%= success %></div>
+  <% if (messages.success && messages.success.length > 0) { %>
+    <div class="flash-success"><%= messages.success[0] %></div>
   <% } %>
-  <% if (error && error.length > 0) { %>
-    <div class="flash-error"><%= error %></div>
+  <% if (messages.error && messages.error.length > 0) { %>
+    <div class="flash-error"><%= messages.error[0] %></div>
   <% } %>
 
   <!-- Boat Availability Section -->
@@ -28,10 +31,10 @@
     <form method="POST" action="/admin/update-boats">
       <% boats.forEach(boat => { %>
         <label style="display: block; margin: 12px 0; font-weight: 600;">
-          <input type="checkbox" name="<%= boat.name %>" <%= boat.available ? 'checked' : '' %> />
+          <input type="checkbox" name="<%= boat._id %>" <%= boat.availability ? 'checked' : '' %> />
           <%= boat.display %>
-          <span class="<%= boat.available ? 'status-available' : 'status-unavailable' %>">
-            (<%= boat.available ? "Available" : "Unavailable" %>)
+          <span class="<%= boat.availability ? 'status-available' : 'status-unavailable' %>">
+            (<%= boat.availability ? "Available" : "Unavailable" %>)
           </span>
         </label>
       <% }) %>
@@ -44,7 +47,7 @@
   <!-- All Bookings Section -->
   <div class="admin-section">
     <h2>📋 Booking Records</h2>
-    <% if (bookings.length === 0) { %>
+    <% if (!bookings || bookings.length === 0) { %>
       <p>No bookings found yet.</p>
     <% } else { %>
       <table class="styled-table">
@@ -58,6 +61,7 @@
             <th>Phone</th>
             <th>User Name</th>
             <th>User Email</th>
+            <th>Status</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -65,10 +69,10 @@
           <% bookings.forEach((b, index) => { %>
             <tr>
               <td><%= index + 1 %></td>
-              <td><%= b.boat %></td>
-              <td><%= b.date %></td>
-              <td><%= b.hours %></td>
-              <td><%= b.persons %></td>
+              <td><%= b.boat && b.boat.name ? b.boat.name : "Unknown" %></td>
+              <td><%= b.bookingDate ? b.bookingDate.toLocaleDateString() : "" %></td>
+              <td><%= b.startTime && b.endTime ? b.startTime + ' - ' + b.endTime : '--' %></td>
+              <td><%= b.numberOfPersons %></td>
               <td>
                 <% if (b.phoneNumber) { %>
                   <a href="tel:<%= b.phoneNumber %>"><%= b.phoneNumber %></a>
@@ -76,8 +80,9 @@
                   <span style="color:#aaa;">Not provided</span>
                 <% } %>
               </td>
-              <td><%= b.user && b.user.name ? b.user.name : '' %></td>
-              <td><%= b.user && b.user.email ? b.user.email : '' %></td>
+              <td><%= b.user && b.user.name ? b.user.name : 'Unknown' %></td>
+              <td><%= b.user && b.user.email ? b.user.email : 'Unknown' %></td>
+              <td><%= b.status %></td>
               <td>
                 <form action="/admin/delete-booking/<%= b._id %>" method="POST" style="display:inline;">
                   <button class="btn-save" onclick="return confirm('Delete this booking?')" style="padding:2px 13px;">🗑️ Delete</button>
@@ -102,10 +107,8 @@
     const socket = io();
     socket.on('new-booking', () => {
       document.getElementById("notif").play();
-      // Optionally reload bookings or show a toast here
       location.reload();
     });
   </script>
-
 </body>
 </html>
