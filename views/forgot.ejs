@@ -1,12 +1,20 @@
-<h2>Forgot Password</h2>
-<form method="post" action="/forgot">
-  <input type="email" name="email" placeholder="Enter your email" required>
-  <button type="submit">Send Reset Link</button>
-</form>
-<% if (error && error.length > 0) { %>
-  <div style="color:red"><%= error[0] %></div>
-<% } %>
-<% if (success && success.length > 0) { %>
-  <div style="color:green"><%= success[0] %></div>
-<% } %>
-<a href="/login">Back to Login</a>
+<div class="forgot-container">
+
+  <h2>Forgot Password</h2>
+  
+  <form class="forgot-form" method="post" action="/forgot">
+    <input type="email" name="email" placeholder="Enter your email" required>
+    <button type="submit">Send Reset Link</button>
+  </form>
+
+  <div class="forgot-messages">
+    <% if (messages.error && messages.error.length > 0) { %>
+      <div class="error"><%= messages.error[0] %></div>
+    <% } %>
+    <% if (messages.success && messages.success.length > 0) { %>
+      <div class="success"><%= messages.success[0] %></div>
+    <% } %>
+  </div>
+  
+  <a href="/login">← Back to Login</a>
+</div>

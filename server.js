@@ -1,340 +1,316 @@
-// Load environment variables
 require('dotenv').config();
-
 const express = require('express');
 const mongoose = require('mongoose');
+const path = require('path');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
-const bcrypt = require('bcryptjs');
 const flash = require('connect-flash');
-const path = require('path');
-const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
-const http = require('http');
-const { format } = require('@fast-csv/format');
-const PDFDocument = require('pdfkit');
-const socketIO = require('socket.io');
-const User = require('./models/user');
-const Boat = require('./models/boat');
-const Booking = require('./models/booking');
+const crypto = require('crypto');
+const methodOverride = require('method-override');
 
-// Express/server setup
 const app = express();
-const server = http.createServer(app);
-const io = socketIO(server);
+const PORT = process.env.PORT || 3000;
 
-const PORT = 3000;
+// ===== Mongoose Models =====
 
-// Nodemailer transporter (Gmail)
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+const userSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  isAdmin: { type: Boolean, default: false },
+  resetToken: String,
+  resetTokenExpires: Date
 });
+userSchema.pre('save', async function(next) {
+  if (this.isModified('password')) this.password = await bcrypt.hash(this.password, 10);
+  next();
+});
+const User = mongoose.model('User', userSchema);
 
-// Sync boats on DB boot
-const boatsArray = [
-  { name: "Boat 1", display: "ORYX 46 ft (12-15) – 500 AED/hr", max: 15, price: 500, available: true },
-  { name: "Boat 2", display: "Majesty 56 ft (20) – 800 AED/hr", max: 20, price: 800, available: true },
-  { name: "Boat 3", display: "Fishing/Speed Boat 31 ft (10) – 349 AED/hr", max: 10, price: 349, available: true },
-  { name: "Boat 4", display: "ORYX 36 ft (10) – 400 AED/hr", max: 10, price: 400, available: true }
-];
+const boatSchema = new mongoose.Schema({
+  name: { type: String, required: true, unique: true },
+  display: String,
+  maxPersons: { type: Number, required: true },
+  pricePerHour: { type: Number, required: true },
+  imageUrl: { type: String, default: '/images/default_boat.jpg' },
+  availability: { type: Boolean, default: true }
+});
+const Boat = mongoose.model('Boat', boatSchema);
 
-// MongoDB Connection
+const bookingSchema = new mongoose.Schema({
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  boat: { type: mongoose.Schema.Types.ObjectId, ref: 'Boat', required: true },
+  bookingDate: { type: Date, required: true },
+  startTime: { type: String, required: true },
+  endTime: { type: String, required: true },
+  numberOfPersons: { type: Number, required: true },
+  phoneNumber: { type: String, required: true },
+  totalPrice: { type: Number, required: true },
+  status: { type: String, enum: ['pending', 'confirmed', 'cancelled', 'completed'], default: 'pending' },
+  createdAt: { type: Date, default: Date.now }
+});
+const Booking = mongoose.model('Booking', bookingSchema);
+
+// ===== Connect MongoDB, sync boats =====
+
 mongoose.connect(process.env.MONGO_URI)
-.then(async () => {
-  console.log('✅ MongoDB Connected');
+  .then(() => {
+    console.log('MongoDB connected successfully');
+    syncDefaultBoats();
+  })
+  .catch(err => console.error('MongoDB connection error:', err));
 
-  // Sync boats
-  for (const b of boatsArray) {
-    await Boat.updateOne(
-      { name: b.name },
-      { $setOnInsert: b },
-      { upsert: true }
-    );
+async function syncDefaultBoats() {
+  const defaultBoats = [
+    { name: "Luxury Cruiser", display: "Luxury Yacht", maxPersons: 10, pricePerHour: 500, imageUrl: "/images/luxury_cruiser.jpg" },
+    { name: "Speedster 3000", display: "Speed Boat", maxPersons: 6, pricePerHour: 300, imageUrl: "/images/speedster.jpg" },
+    { name: "Family Fun", display: "Pontoon Boat", maxPersons: 8, pricePerHour: 200, imageUrl: "/images/family_fun.jpg" },
+    { name: "Sail Dream", display: "Sailboat", maxPersons: 4, pricePerHour: 250, imageUrl: "/images/sail_dream.jpg" }
+  ];
+  try {
+    for (const boatData of defaultBoats) {
+      await Boat.findOneAndUpdate(
+        { name: boatData.name },
+        { $set: boatData },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+    }
+    console.log('Default boats synced with database.');
+  } catch (error) {
+    console.error('Error syncing default boats:', error);
   }
+}
 
-  // Admin user creation
-  const adminEmail = "Admin@yachtmarina.com";
-  const adminPassword = "PrinceAnthony@24";
-  const existingAdmin = await User.findOne({ email: adminEmail });
+// ===== Middleware =====
 
-  if (!existingAdmin) {
-    const hash = await bcrypt.hash(adminPassword, 10);
-    await User.create({
-      name: 'Yacht Admin',
-      email: adminEmail,
-      password: hash,
-      isAdmin: true
-    });
-    console.log('✅ Default Admin Created!');
-  }
-
-  console.log('✅ Boats Synced. Ready to Sail ⛵');
-})
-.catch((err) => {
-  console.error('❌ MongoDB Connection Error:', err.message);
-});
-
-// Basic middleware
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.urlencoded({ extended: true }));
-
-// Sessions & flash
+app.use(express.json());
+app.use(methodOverride('_method'));
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'backupsecret',
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  store: MongoStore.create({ mongoUrl: process.env.MONGO_URI })
+  store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
+  cookie: { maxAge: 86400000 }
 }));
 app.use(flash());
 app.use((req, res, next) => {
-  res.locals.success = req.flash("success");
-  res.locals.error = req.flash("error");
-  res.locals.user = req.session.user;
+  res.locals.messages = req.flash();
+  res.locals.user = req.session.user || null;
   next();
 });
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
 
-// Auth utils
-function ensureAuth(req, res, next) {
-  if (req.session.userId) return next();
-  return res.redirect('/login');
-}
-function ensureGuest(req, res, next) {
-  if (!req.session.userId) return next();
-  return res.redirect('/dashboard');
-}
-
-// =============== ROUTES ===============
-
-// Home
-app.get('/', async (req, res) => {
-  const boats = await Boat.find({ available: true });
-  res.render('index', { boats });
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
+  }
 });
 
-// Register
-app.get('/register', ensureGuest, (req, res) => res.render('register'));
+// ===== Authentication Middleware =====
+
+const isAuthenticated = (req, res, next) => {
+  if (req.session.userId) return next();
+  req.flash('error', 'Please log in to access this page.');
+  res.redirect('/login');
+};
+const isAdmin = (req, res, next) => {
+  if (req.session.user && req.session.user.isAdmin) return next();
+  req.flash('error', 'Access denied. Administrator privileges required.');
+  res.redirect('/');
+};
+
+// ======== Routes ========
+
+// --- Home Page ---
+app.get('/', async (req, res) => {
+  try {
+    const boats = await Boat.find({});
+    res.render('index', { boats });
+  } catch (error) {
+    req.flash('error', 'Could not load boats.');
+    res.render('index', { boats: [] });
+  }
+});
+
+// --- User Registration ---
+app.get('/register', (req, res) => res.render('register'));
 app.post('/register', async (req, res) => {
   try {
-    const hash = await bcrypt.hash(req.body.password, 10);
-    await User.create({
-      name: req.body.name,
-      email: req.body.email,
-      password: hash
-    });
-    req.flash("success", "Account created! Please login.");
+    const { name, email, password } = req.body;
+    if (await User.findOne({ email })) {
+      req.flash('error', 'Email already registered.');
+      return res.redirect('/register');
+    }
+    const newUser = new User({ name, email, password });
+    await newUser.save();
+    req.flash('success', 'Registration successful! Please log in.');
     res.redirect('/login');
-  } catch (err) {
-    req.flash("error", "Email already exists.");
+  } catch {
+    req.flash('error', 'Registration failed.');
     res.redirect('/register');
   }
 });
 
-// Login/Logout
-app.get('/login', ensureGuest, (req, res) => res.render('login'));
+// --- Login/Logout ---
+app.get('/login', (req, res) => res.render('login'));
 app.post('/login', async (req, res) => {
-  const user = await User.findOne({ email: req.body.email });
-  if (user && await bcrypt.compare(req.body.password, user.password)) {
-    req.session.userId = user._id;
-    req.session.user = user;
-    res.redirect('/dashboard');
-  } else {
-    req.flash("error", "Invalid login details");
-    res.redirect('/login');
+  const { email, password } = req.body;
+  const user = await User.findOne({ email });
+  if (!user || !(await bcrypt.compare(password, user.password))) {
+    req.flash('error', 'Invalid email or password.');
+    return res.redirect('/login');
   }
+  req.session.userId = user._id;
+  req.session.user = { id: user._id, name: user.name, email: user.email, isAdmin: user.isAdmin };
+  req.flash('success', 'Logged in successfully!');
+  res.redirect('/');
 });
 app.get('/logout', (req, res) => {
-  req.session.destroy(() => res.redirect('/'));
+  req.session.destroy(err => {
+    if (err) console.log(err);
+    res.clearCookie('connect.sid');
+    req.flash('success', 'You have been logged out.');
+    res.redirect('/login');
+  });
 });
 
-// ======= FORGOT PASSWORD & RESET =======
-app.get('/forgot', ensureGuest, (req, res) => res.render('forgot'));
+// === Forgot Password (with /forgot!) ===
+app.get('/forgot', (req, res) => res.render('forgot'));
 app.post('/forgot', async (req, res) => {
-  const user = await User.findOne({ email: req.body.email });
-  if (!user) {
-    req.flash("error", "No account with that email.");
-    return res.redirect('/forgot');
-  }
-  const token = crypto.randomBytes(32).toString('hex');
-  user.resetToken = token;
-  user.resetTokenExpiry = Date.now() + 3600000; // 1hr
-  await user.save();
-
-  // Send reset mail
-  await transporter.sendMail({
-    to: user.email,
-    from: process.env.EMAIL_USER,
-    subject: '🔑 Reset Yacht Booking Password',
-    html: `<p>Click <a href="https://yachtbookingmarina.onrender.com/reset/${token}">here</a> to reset your password (valid 1hr).</p>`
-  });
-
-  req.flash("success", "Password reset link sent! Check your mail.");
-  res.redirect('/login');
-});
-
-app.get('/reset/:token', ensureGuest, async (req, res) => {
-  const user = await User.findOne({
-    resetToken: req.params.token,
-    resetTokenExpiry: { $gt: Date.now() }
-  });
-  if (!user) {
-    req.flash("error", "Forgot password link is expired/invalid.");
-    return res.redirect('/forgot');
-  }
-  res.render('reset-password', { token: req.params.token });
-});
-
-app.post('/reset/:token', async (req, res) => {
-  const user = await User.findOne({
-    resetToken: req.params.token,
-    resetTokenExpiry: { $gt: Date.now() }
-  });
-  if (!user) {
-    req.flash("error", "Token expired! Retry forgot password.");
-    return res.redirect('/forgot');
-  }
-  user.password = await bcrypt.hash(req.body.password, 10);
-  user.resetToken = undefined;
-  user.resetTokenExpiry = undefined;
-  await user.save();
-  req.flash("success", "Password changed! Please log in.");
-  res.redirect('/login');
-});
-
-// ======= Book a Yacht + Notification/Email =======
-app.post('/book', ensureAuth, async (req, res) => {
   try {
-    const booking = await Booking.create({
-      boat: req.body.boat,
-      date: req.body.date,
-      hours: req.body.hours,
-      persons: req.body.persons,
-      user: req.session.userId,
-      phoneNumber: req.body.phoneNumber // ← must be present in form
-    });
-    const user = await User.findById(req.session.userId);
+    const user = await User.findOne({ email: req.body.email });
+    if (!user) {
+      req.flash('error', 'No account with that email address exists.');
+      return res.redirect('/forgot');
+    }
+    const resetToken = crypto.randomBytes(20).toString('hex');
+    user.resetToken = resetToken;
+    user.resetTokenExpires = Date.now() + 3600000; // 1 hour
+    await user.save();
 
-    // Confirm email
+    const resetUrl = `http://localhost:${PORT}/reset-password/${resetToken}`;
     await transporter.sendMail({
       to: user.email,
       from: process.env.EMAIL_USER,
-      subject: "✅ Booking Confirmed",
-      html: `<p>Hi ${user.name},<br>Your booking for ${booking.boat} on ${booking.date} is confirmed.<br>Thank you!</p>`
+      subject: 'Yacht Marina Booking - Password Reset',
+      html: `<p>Click <a href="${resetUrl}">here</a> to reset your password. This link will expire in 1 hour.</p>`
     });
 
-    io.emit('new-booking');
+    req.flash('success', 'A password reset link has been sent to your email.');
+    res.redirect('/forgot');
+  } catch {
+    req.flash('error', 'Could not send reset email. Try again.');
+    res.redirect('/forgot');
+  }
+});
 
-    req.flash("success", "✅ Booking confirmed! Details emailed.");
-    res.redirect('/dashboard');
-  } catch (e) {
-    req.flash("error", "Booking failed: " + (e.message || ""));
+app.get('/reset-password/:token', async (req, res) => {
+  try {
+    const user = await User.findOne({
+      resetToken: req.params.token,
+      resetTokenExpires: { $gt: Date.now() }
+    });
+    if (!user) {
+      req.flash('error', 'Token is invalid or expired.');
+      return res.redirect('/forgot');
+    }
+    res.render('reset-password', { token: req.params.token });
+  } catch {
+    req.flash('error', 'Server error.');
+    res.redirect('/forgot');
+  }
+});
+app.post('/reset-password/:token', async (req, res) => {
+  try {
+    const user = await User.findOne({
+      resetToken: req.params.token,
+      resetTokenExpires: { $gt: Date.now() }
+    });
+    if (!user) {
+      req.flash('error', 'Token is invalid or expired.');
+      return res.redirect('/forgot');
+    }
+    if (req.body.password !== req.body.confirmPassword) {
+      req.flash('error', 'Passwords do not match.');
+      return res.redirect('/reset-password/' + req.params.token);
+    }
+    user.password = req.body.password;
+    user.resetToken = undefined;
+    user.resetTokenExpires = undefined;
+    await user.save();
+    req.flash('success', 'Your password has been updated!');
+    res.redirect('/login');
+  } catch {
+    req.flash('error', 'Error resetting password.');
+    res.redirect('/forgot');
+  }
+});
+
+// --- Booking Example (Add your own as needed) ---
+app.get('/book/:boatId', isAuthenticated, async (req, res) => {
+  const boat = await Boat.findById(req.params.boatId);
+  if (!boat) {
+    req.flash('error', 'Boat not found.');
+    return res.redirect('/');
+  }
+  res.render('book', { boat });
+});
+app.post('/book', isAuthenticated, async (req, res) => {
+  try {
+    const { boatId, bookingDate, startTime, endTime, numberOfPersons, phoneNumber } = req.body;
+    const boat = await Boat.findById(boatId);
+    if (!boat) {
+      req.flash('error', 'Boat not found for booking.');
+      return res.redirect('/');
+    }
+    // Basic price calculation
+    const startHour = parseInt(startTime.split(':')[0]);
+    const endHour = parseInt(endTime.split(':')[0]);
+    const durationHours = endHour - startHour;
+    const totalPrice = durationHours * boat.pricePerHour;
+    const newBooking = new Booking({
+      user: req.session.userId,
+      boat: boatId,
+      bookingDate: new Date(bookingDate),
+      startTime,
+      endTime,
+      numberOfPersons,
+      phoneNumber,
+      totalPrice
+    });
+    await newBooking.save();
+    req.flash('success', 'Booking successful!');
+    res.redirect('/bookings');
+  } catch (error) {
+    req.flash('error', 'Booking failed. Please try again.');
     res.redirect('/');
   }
 });
-
-// ======= User Dashboard =======
-app.get('/dashboard', ensureAuth, async (req, res) => {
-  const bookings = await Booking.find({ user: req.session.userId });
-  res.render('dashboard', { bookings });
+app.get('/bookings', isAuthenticated, async (req, res) => {
+  const bookings = await Booking.find({ user: req.session.userId }).populate('boat').sort({ bookingDate: 1, startTime: 1 });
+  res.render('bookings', { bookings });
 });
 
-// ======= Admin Panel =======
-app.get('/admin', ensureAuth, async (req, res) => {
-  if (!req.session.user.isAdmin) return res.send('Access Denied');
-  const boats = await Boat.find();
-  const bookings = await Booking.find().populate('user');
-  res.render('admin', { bookings, boats });
-});
-app.post('/admin/update-boats', ensureAuth, async (req, res) => {
-  if (!req.session.user.isAdmin) return res.send('Access Denied');
-  const boats = await Boat.find();
-  for (let boat of boats) {
-    const available = req.body[boat.name] === 'on';
-    await Boat.updateOne({ name: boat.name }, { available });
-  }
-  req.flash("success", "✅ Boat availability updated");
-  res.redirect('/admin');
+// Profile
+app.get('/profile', isAuthenticated, (req, res) => {
+  res.render('profile', { user: req.session.user });
 });
 
-// ======= Admin: CSV Export =======
-app.get('/admin/export/csv', ensureAuth, async (req, res) => {
-  if (!req.session.user.isAdmin) return res.send('Access Denied');
-  const bookings = await Booking.find().populate('user');
-  res.setHeader('Content-Disposition', 'attachment; filename=bookings.csv');
-  res.setHeader('Content-Type', 'text/csv');
-  const csvStream = format({ headers: true });
-  csvStream.pipe(res);
-  bookings.forEach(b => {
-    csvStream.write({
-      Boat: b.boat,
-      Date: b.date,
-      Hours: b.hours,
-      Persons: b.persons,
-      Phone: b.phoneNumber,
-      Name: b.user?.name,
-      Email: b.user?.email
-    });
-  });
-  csvStream.end();
+// Admin Dashboard (Simple Example)
+app.get('/admin/dashboard', isAuthenticated, isAdmin, async (req, res) => {
+  const users = await User.find({});
+  const bookings = await Booking.find({}).populate('user').populate('boat').sort({ createdAt: -1 });
+  res.render('admin/dashboard', { users, bookings });
 });
 
-// ======= Admin: PDF Export =======
-app.get('/admin/export/pdf', ensureAuth, async (req, res) => {
-  if (!req.session.user.isAdmin) return res.send('Access Denied');
-  const bookings = await Booking.find().populate('user');
-  res.setHeader('Content-Disposition', 'attachment; filename=bookings.pdf');
-  res.setHeader('Content-Type', 'application/pdf');
-  const doc = new PDFDocument();
-  doc.pipe(res);
-  doc.fontSize(20).text('📋 Booking Records', { align: 'center' }).moveDown();
-  bookings.forEach((b, i) => {
-    doc.fontSize(12).text(`${i + 1}. 🛥 Boat: ${b.boat}, 📅 Date: ${b.date}, ⏱ Hours: ${b.hours}, 👥 Persons: ${b.persons}, ☎️ Phone: ${b.phoneNumber}, 👤 User: ${b.user?.name} (${b.user?.email})`);
-  });
-  doc.end();
-});
-
-// ======= Admin: Booking Delete/Edit =======
-app.post('/admin/delete-booking/:id', ensureAuth, async (req, res) => {
-  if (!req.session.user.isAdmin) return res.send('Access Denied');
-  await Booking.deleteOne({ _id: req.params.id });
-  req.flash("success", "✅ Booking deleted");
-  res.redirect('/admin');
-});
-app.get('/admin/edit-booking/:id', ensureAuth, async (req, res) => {
-  if (!req.session.user.isAdmin) return res.send('Access Denied');
-  const booking = await Booking.findById(req.params.id).populate('user');
-  const boats = await Boat.find();
-  res.render('edit-booking', { booking, boats });
-});
-app.post('/admin/edit-booking/:id', ensureAuth, async (req, res) => {
-  if (!req.session.user.isAdmin) return res.send('Access Denied');
-  await Booking.updateOne(
-    { _id: req.params.id },
-    {
-      boat: req.body.boat,
-      date: req.body.date,
-      hours: req.body.hours,
-      persons: req.body.persons,
-      phoneNumber: req.body.phoneNumber,
-    }
-  );
-  req.flash("success", "✅ Booking updated");
-  res.redirect('/admin');
-});
-
-// 404 Not Found Handler
-app.use((req, res) => {
-  res.status(404).send('<h2>404 - Page Not Found</h2>');
-});
-
-// === Socket.IO for admin notifications ===
-io.on('connection', socket => {
-  // Optionally log: console.log('Admin connected...');
-});
-
-// Final listen (note: use server, not app)
-server.listen(PORT, () => {
-  console.log(`🚢 Yacht Booking server running on http://localhost:${PORT}`);
+// --- Start Server ---
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
