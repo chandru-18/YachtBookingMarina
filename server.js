@@ -161,7 +161,7 @@ app.use(session({
     resave: false,
     saveUninitialized: false,
     // FIX APPLIED HERE: Corrected environment variable name for MongoStore
-    store: MongoStore.create({ mongoUrl: process.env.MONGODB_URI }),
+    store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
     cookie: { maxAge: 86400000, httpOnly: true, secure: process.env.NODE_ENV === 'production' } // 24 hours
 }));
 app.use(flash());
