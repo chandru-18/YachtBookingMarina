@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Yacht: <%= boat.display || boat.name %></title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <header>
+        <h1>Yacht Marina Booking</h1>
+        <p>Your Premier Destination for Yacht Rentals</p>
+        <nav>
+            <ul>
+                <li><a href="/">Home</a></li>
+                <% if (user) { %>
+                    <li><a href="/dashboard">Dashboard</a></li>
+                    <li><a href="/bookings">My Bookings</a></li>
+                    <li><a href="/profile">Profile</a></li>
+                    <% if (user.isAdmin) { %>
+                        <li><a href="/admin/dashboard">Admin Panel</a></li>
+                    <% } %>
+                    <li><a href="/logout">Logout</a></li>
+                <% } else { %>
+                    <li><a href="/login">Login</a></li>
+                    <li><a href="/register">Register</a></li>
+                <% } %>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="message-container">
+            <% if (messages.success && messages.success.length > 0) { %>
+                <div class="message success"><%= messages.success[0] %></div>
+            <% } %>
+            <% if (messages.error && messages.error.length > 0) { %>
+                <div class="message error"><%= messages.error[0] %></div>
+            <% } %>
+        </div>
+
+        <section class="form-container"
+                 data-boat-id="<%= boat._id %>"
+                 data-boat-price-per-hour="<%= boat.pricePerHour %>"
+                 data-boat-max-persons="<%= boat.maxPersons %>">
+            <h2>🚤 Book <%= boat.display || boat.name %></h2>
+            <img src="<%= boat.imageUrl %>" alt="<%= boat.display || boat.name %>" style="max-width: 100%; height: 200px; object-fit: cover; border-radius: 8px; margin-bottom: 20px;">
+            <p>Max Persons: <span id="max-persons-display" style="font-weight: bold;"><%= boat.maxPersons %></span></p>
+            <p>Price: AED <%= boat.pricePerHour %> / hour</p>
+            <p>Description: <%= boat.description || 'No description available.' %></p>
+
+
+            <form action="/book" method="POST" class="styled-form" id="booking-form">
+                <input type="hidden" name="boatId" value="<%= boat._id %>">
+
+                <label for="bookingDate">Date</label>
+                <input type="date" name="bookingDate" id="bookingDate" required autocomplete="bday">
+
+                <label for="startTime">Start Time</label>
+                <input type="time" name="startTime" id="startTime" required autocomplete="off">
+
+                <label for="endTime">End Time</label>
+                <input type="time" name="endTime" id="endTime" required autocomplete="off">
+
+                <p style="font-size: 0.9em; color: #555; text-align: left; margin-top: -10px;">Select times between 09:00 and 21:00.</p>
+
+                <label for="numberOfPersons">Number of Persons</label>
+                <input type="number" name="numberOfPersons" id="numberOfPersons" min="1" placeholder="Number of Persons" required autocomplete="off">
+
+                <label for="phoneNumber">Phone Number</label>
+                <input type="tel" name="phoneNumber" id="phoneNumber"
+                        pattern="[0-9]{7,15}"
+                        maxlength="15"
+                        placeholder="e.g., +911234567890 or 1234567890"
+                        required autocomplete="tel">
+
+                <p style="text-align: center; margin-top: 1.5rem; font-weight: bold; font-size: 1.2rem;">Total Price: <span id="total-price-display">AED 0</span></p>
+
+                <button type="submit" class="btn btn-primary">✅ Confirm Booking</button>
+            </form>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; <%= new Date().getFullYear() %> Yacht Marina Booking. All rights reserved.</p>
+    </footer>
+
+    <script src="/script.js"></script>
+</body>
+</html>

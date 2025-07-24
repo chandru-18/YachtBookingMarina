@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Dashboard</title>
+    <title>My Bookings</title>
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -35,37 +35,9 @@
         </div>
 
         <section class="dashboard-section">
-            <h2>Welcome, <%= user.name %>!</h2>
-            <p>This is your personal dashboard. Here you can see a summary of your activities.</p>
+            <h2>My Bookings</h2>
 
-            <div class="dashboard-widgets">
-                <div class="widget-card">
-                    <h3>Your Total Bookings</h3>
-                    <p><%= bookings.length %></p>
-                </div>
-                <div class="widget-card">
-                    <h3>Pending Bookings</h3>
-                    <p><%= bookings.filter(b => b.status === 'pending').length %></p>
-                </div>
-                <div class="widget-card">
-                    <h3>Confirmed Bookings</h3>
-                    <p><%= bookings.filter(b => b.status === 'confirmed').length %></p>
-                </div>
-            </div>
-
-            <h3 style="margin-top: 3rem;">Upcoming Bookings</h3>
-            <%
-                const now = new Date();
-                const upcomingBookings = bookings.filter(b => {
-                    const bookingDateTime = new Date(`${b.bookingDate.toISOString().split('T')[0]}T${b.startTime}:00`);
-                    return bookingDateTime > now;
-                }).sort((a,b) => {
-                    const dateA = new Date(`${a.bookingDate.toISOString().split('T')[0]}T${a.startTime}:00`);
-                    const dateB = new Date(`${b.bookingDate.toISOString().split('T')[0]}T${b.startTime}:00`);
-                    return dateA - dateB;
-                });
-            %>
-            <% if (upcomingBookings.length > 0) { %>
+            <% if (bookings.length > 0) { %>
                 <div class="responsive-table">
                     <table>
                         <thead>
@@ -77,11 +49,12 @@
                                 <th>Persons</th>
                                 <th>Price</th>
                                 <th>Status</th>
+                                <th>Booked At</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <% upcomingBookings.forEach(booking => { %>
+                            <% bookings.forEach(booking => { %>
                                 <tr>
                                     <td><%= booking._id.toString().slice(-6) %></td>
                                     <td><%= booking.boat.display || booking.boat.name %></td>
@@ -90,6 +63,7 @@
                                     <td><%= booking.numberOfPersons %></td>
                                     <td>د.إ <%= booking.totalPrice %></td>
                                     <td><span class="status-badge status-<%= booking.status %>"><%= booking.status %></span></td>
+                                    <td><%= booking.createdAt.toLocaleDateString() %></td>
                                     <td>
                                         <% if (booking.status === 'pending' || booking.status === 'confirmed') { %>
                                             <form action="/bookings/<%= booking._id %>" method="POST" style="display:inline;">
@@ -106,11 +80,9 @@
                     </table>
                 </div>
             <% } else { %>
-                <p class="text-center">You have no upcoming bookings.</p>
+                <p class="text-center">You have no bookings yet.</p>
                 <p class="text-center"><a href="/" class="btn btn-primary">Book a Yacht Now!</a></p>
             <% } %>
-
-            <p style="margin-top: 3rem; text-align: center;"><a href="/bookings">View All My Bookings (Past & Future)</a></p>
         </section>
     </main>
 

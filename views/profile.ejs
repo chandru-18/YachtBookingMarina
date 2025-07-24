@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Profile</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <header>
+        <h1>Yacht Marina Booking</h1>
+        <p>Your Premier Destination for Yacht Rentals</p>
+        <nav>
+            <ul>
+                <li><a href="/">Home</a></li>
+                <li><a href="/dashboard">Dashboard</a></li>
+                <li><a href="/bookings">My Bookings</a></li>
+                <li><a href="/profile">Profile</a></li>
+                <% if (user && user.isAdmin) { %>
+                    <li><a href="/admin/dashboard">Admin Panel</a></li>
+                <% } %>
+                <li><a href="/logout">Logout</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="message-container">
+            <% if (messages.success && messages.success.length > 0) { %>
+                <div class="message success"><%= messages.success[0] %></div>
+            <% } %>
+            <% if (messages.error && messages.error.length > 0) { %>
+                <div class="message error"><%= messages.error[0] %></div>
+            <% } %>
+        </div>
+
+        <section class="form-container">
+            <h2>My Profile Details</h2>
+            <div class="profile-details">
+                <p><strong>Name:</strong> <%= user.name %></p>
+                <p><strong>Email:</strong> <%= user.email %></p>
+                <p><strong>Account Type:</strong> <%= user.isAdmin ? 'Administrator' : 'Regular User' %></p>
+                <p><strong>Email Verified:</strong> <%= user.isVerified ? 'Yes' : 'No' %></p>
+                <% if (!user.isVerified && !user.isAdmin) { %>
+                    <p class="text-muted" style="font-style: italic;">
+                        Please verify your email to ensure full account access.
+                        <a href="/verify-email" class="btn btn-secondary btn-small">Verify Now</a>
+                    </p>
+                <% } %>
+            </div>
+            <div style="margin-top: 20px;">
+                <p><a href="/forgot" class="btn btn-tertiary">Change Password</a></p>
+                </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; <%= new Date().getFullYear() %> Yacht Marina Booking. All rights reserved.</p>
+    </footer>
+
+    <script src="/script.js"></script>
+</body>
+</html>

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forgot Password</title>
+    <title>Verify Your Email</title>
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -13,8 +13,11 @@
         <nav>
             <ul>
                 <li><a href="/">Home</a></li>
-                <li><a href="/login">Login</a></li>
-                <li><a href="/register">Register</a></li>
+                <% if (user) { %>
+                    <li><a href="/logout">Logout</a></li>
+                <% } else { %>
+                    <li><a href="/login">Login</a></li>
+                <% } %>
             </ul>
         </nav>
     </header>
@@ -30,15 +33,17 @@
         </div>
 
         <section class="form-container">
-            <h2>Forgot Your Password?</h2>
-            <p>Enter your email address below and we'll send you a link to reset your password.</p>
-            <form action="/forgot" method="POST" class="styled-form">
-                <label for="email">Email</label>
-                <input type="email" id="email" name="email" required autocomplete="email">
-
-                <button type="submit" class="btn btn-primary">Send Reset Link</button>
-            </form>
-            <p><a href="/login">Back to Login</a></p>
+            <h2>Verify Your Email Address</h2>
+            <p>A verification link has been sent to **<%= user.email %>**.</p>
+            <p>Please check your inbox (and spam folder) to verify your account.</p>
+            <p>Once verified, you can log in and access all features.</p>
+            <div style="margin-top: 20px;">
+                <p>Did not receive the email?</p>
+                <form action="/resend-verification" method="POST" style="display: inline;">
+                    <button type="submit" class="btn btn-secondary">Resend Verification Email</button>
+                </form>
+            </div>
+            <p style="margin-top: 20px;"><a href="/logout" class="btn btn-tertiary">Logout</a></p>
         </section>
     </main>
 

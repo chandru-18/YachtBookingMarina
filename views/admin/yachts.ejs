@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Yachts - Admin</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        /* Basic styling for yacht images in table */
+        .yacht-thumbnail {
+            width: 80px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Admin Dashboard</h1>
+        <p>Manage users and bookings</p>
+        <nav>
+            <ul>
+                <li><a href="/">Home</a></li>
+                <li><a href="/dashboard">Dashboard</a></li>
+                <li><a href="/bookings">My Bookings</a></li>
+                <li><a href="/profile">Profile</a></li>
+                <li><a href="/admin/dashboard">Admin Panel</a></li>
+                <li><a href="/logout">Logout</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <div class="message-container">
+            <% if (messages.success && messages.success.length > 0) { %>
+                <div class="message success"><%= messages.success[0] %></div>
+            <% } %>
+            <% if (messages.error && messages.error.length > 0) { %>
+                <div class="message error"><%= messages.error[0] %></div>
+            <% } %>
+        </div>
+
+        <section class="dashboard-section">
+            <h2>Manage Yachts</h2>
+            <p><a href="/admin/yachts/add" class="btn btn-primary">➕ Add New Yacht</a></p>
+
+            <% if (yachts.length > 0) { %>
+                <div class="responsive-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Image</th>
+                                <th>Name</th>
+                                <th>Display Name</th>
+                                <th>Max Persons</th>
+                                <th>Price/Hour</th>
+                                <th>Description</th>
+                                <th>Availability</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% yachts.forEach(yacht => { %>
+                                <tr>
+                                    <td><img src="<%= yacht.imageUrl %>" alt="<%= yacht.name %>" class="yacht-thumbnail"></td>
+                                    <td><%= yacht.name %></td>
+                                    <td><%= yacht.display %></td>
+                                    <td><%= yacht.maxPersons %></td>
+                                    <td>AED <%= yacht.pricePerHour %></td>
+                                    <td><%= yacht.description.substring(0, 50) %><% if (yacht.description.length > 50) { %>...<% } %></td>
+                                    <td>
+                                        <span class="status-badge status-<%= yacht.availability ? 'confirmed' : 'cancelled' %>">
+                                            <%= yacht.availability ? 'Available' : 'Unavailable' %>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <a href="/admin/yachts/edit/<%= yacht._id %>" class="btn btn-primary btn-small">Edit</a>
+                                        <form action="/admin/yachts/<%= yacht._id %>?_method=DELETE" method="POST" style="display:inline;">
+                                            <button type="submit" class="btn btn-danger btn-small" onclick="return confirm('Are you sure you want to delete <%= yacht.name %>? This will delete the yacht and its image.');">Delete</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            <% }) %>
+                        </tbody>
+                    </table>
+                </div>
+            <% } else { %>
+                <p class="text-center">No yachts found. Add a new yacht!</p>
+            <% } %>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; <%= new Date().getFullYear() %> Yacht Marina Booking. All rights reserved.</p>
+    </footer>
+</body>
+</html>
