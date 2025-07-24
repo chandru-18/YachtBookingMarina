@@ -15,6 +15,9 @@ const fs = require('fs'); // For deleting files
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Log the port the server is trying to run on
+console.log(`Server starting on port: ${PORT}`);
+
 // ====== Models =======
 const userSchema = new mongoose.Schema({
     name: { type: String, required: true, trim: true },
@@ -51,7 +54,7 @@ const bookingSchema = new mongoose.Schema({
     boat: { type: mongoose.Schema.Types.ObjectId, ref: 'Boat', required: true },
     bookingDate: { type: Date, required: true },
     startTime: { type: String, required: true }, // HH:MM format
-    endTime: { type: String, required: true },   // HH:MM format
+    endTime: { type: String, required: true },   // HH:MM format
     numberOfPersons: { type: Number, required: true, min: 1 },
     phoneNumber: { type: String, required: true, trim: true },
     totalPrice: { type: Number, required: true, min: 0 },
@@ -77,7 +80,7 @@ bookingSchema.pre('save', function(next) {
 const Booking = mongoose.model('Booking', bookingSchema);
 
 // ===== MongoDB Connection & Default Boats ======
-mongoose.connect(process.env.MONGO_URI)
+mongoose.connect(process.env.MONGODB_URI)
     .then(() => {
         console.log('MongoDB connected successfully');
         syncDefaultBoats(); // Ensure this is called only once on startup
@@ -157,7 +160,7 @@ app.use(session({
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
+    store: MongoStore.create({ mongoUrl: process.env.MONGODB_URI }),
     cookie: { maxAge: 86400000, httpOnly: true, secure: process.env.NODE_ENV === 'production' } // 24 hours
 }));
 app.use(flash());
@@ -300,7 +303,7 @@ app.post('/register', async (req, res) => {
         });
         await newUser.save();
 
-        const verificationUrl = `http://localhost:${PORT}/verify/${verificationToken}`;
+        const verificationUrl = `http://localhost:${PORT}/verify/${verificationToken}`; // This should be your production URL
         transporter.sendMail({
             to: newUser.email,
             from: process.env.EMAIL_USER,
@@ -325,17 +328,33 @@ app.post('/register', async (req, res) => {
 
 // Login/Logout
 app.get('/login', (req, res) => res.render('login'));
+
+// **MODIFIED LOGIN POST ROUTE WITH DEBUG LOGS**
 app.post('/login', async (req, res) => {
+    console.log('Attempting login...'); //
     try {
         const { email, password } = req.body;
+        console.log(`Login request for email: ${email}`); //
+
         const user = await User.findOne({ email });
 
-        if (!user || !(await bcrypt.compare(password, user.password))) {
+        if (!user) {
+            console.log('Login failed: User not found for email:', email); //
             req.flash('error', 'Invalid email or password.');
             return res.redirect('/login');
         }
+        console.log('Login: User found. Comparing password...'); //
+        const isMatch = await bcrypt.compare(password, user.password);
+
+        if (!isMatch) {
+            console.log('Login failed: Password mismatch for user:', email); //
+            req.flash('error', 'Invalid email or password.');
+            return res.redirect('/login');
+        }
+
         // Only non-admin users need to verify email
         if (!user.isVerified && !user.isAdmin) {
+            console.log('Login failed: Email not verified for user:', email); //
             req.flash('error', 'Your email is not verified. Please check your inbox or resend the verification email.');
             return res.redirect('/verify-email');
         }
@@ -348,10 +367,11 @@ app.post('/login', async (req, res) => {
             isAdmin: user.isAdmin,
             isVerified: user.isVerified
         };
+        console.log('Login successful for user:', user.email); //
         req.flash('success', 'Logged in successfully!');
         res.redirect('/dashboard');
     } catch (error) {
-        console.error('Login error:', error);
+        console.error('Login error (catch block):', error); //
         req.flash('error', 'An error occurred during login.');
         res.redirect('/login');
     }
@@ -431,7 +451,7 @@ app.post('/resend-verification', async (req, res) => {
         user.verificationTokenExpires = Date.now() + 3600000; // 1 hour
         await user.save();
 
-        const verificationUrl = `http://localhost:${PORT}/verify/${newVerificationToken}`;
+        const verificationUrl = `http://localhost:${PORT}/verify/${newVerificationToken}`; // This should be your production URL
         transporter.sendMail({
             to: user.email,
             from: process.env.EMAIL_USER,
@@ -469,7 +489,7 @@ app.post('/forgot', async (req, res) => {
         user.resetTokenExpires = Date.now() + 3600000; // 1 hour
         await user.save();
 
-        const resetUrl = `http://localhost:${PORT}/reset-password/${resetToken}`;
+        const resetUrl = `http://localhost:${PORT}/reset-password/${resetToken}`; // This should be your production URL
         transporter.sendMail({
             to: user.email,
             from: process.env.EMAIL_USER,
@@ -819,153 +839,185 @@ app.post('/admin/edit-booking/:id', isAuthenticated, isAdmin, async (req, res) =
             booking.bookingDate = parsedBookingDate;
         }
         if (startTime) {
-            const timeRegex = /^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/;
+            const timeRegex = /^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/; // HH:MM format (00:00 to 23:59)
             if (!timeRegex.test(startTime)) {
-                req.flash('error', 'Invalid start time format (HH:MM).');
+                req.flash('error', 'Invalid start time format. Please use HH:MM.');
                 return res.redirect(`/admin/edit-booking/${req.params.id}`);
             }
             booking.startTime = startTime;
         }
         if (endTime) {
-            const timeRegex = /^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/;
+            const timeRegex = /^(0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$/; // HH:MM format (00:00 to 23:59)
             if (!timeRegex.test(endTime)) {
-                req.flash('error', 'Invalid end time format (HH:MM).');
+                req.flash('error', 'Invalid end time format. Please use HH:MM.');
                 return res.redirect(`/admin/edit-booking/${req.params.id}`);
             }
             booking.endTime = endTime;
         }
         if (numberOfPersons) {
             const numPersons = parseInt(numberOfPersons);
-            if (isNaN(numPersons) || numPersons < 1) {
-                req.flash('error', 'Number of persons must be a positive number.');
+            const boat = await Boat.findById(boatId || booking.boat); // Use new boatId if provided, else current
+            if (isNaN(numPersons) || numPersons < 1 || (boat && numPersons > boat.maxPersons)) {
+                req.flash('error', `Number of persons must be between 1 and ${boat ? boat.maxPersons : 'max allowed'}.`);
                 return res.redirect(`/admin/edit-booking/${req.params.id}`);
             }
             booking.numberOfPersons = numPersons;
         }
         if (phoneNumber) {
-             if (!/^\+?[0-9\s-()]{7,20}$/.test(phoneNumber)) {
-                 req.flash('error', 'Please enter a valid phone number (min 7, max 20 digits, can include +, spaces, -, ()).');
-                 return res.redirect(`/admin/edit-booking/${req.params.id}`);
-             }
-             booking.phoneNumber = phoneNumber;
+            if (!/^\+?[0-9\s-()]{7,20}$/.test(phoneNumber)) {
+                req.flash('error', 'Please enter a valid phone number (min 7, max 20 digits, can include +, spaces, -, ()).');
+                return res.redirect(`/admin/edit-booking/${req.params.id}`);
+            }
+            booking.phoneNumber = phoneNumber;
+        }
+        if (boatId) {
+            const newBoat = await Boat.findById(boatId);
+            if (!newBoat) {
+                req.flash('error', 'New boat selected not found.');
+                return res.redirect(`/admin/edit-booking/${req.params.id}`);
+            }
+            booking.boat = boatId;
         }
         if (status) {
             const validStatuses = ['pending', 'confirmed', 'cancelled', 'completed'];
             if (!validStatuses.includes(status)) {
-                req.flash('error', 'Invalid booking status.');
+                req.flash('error', 'Invalid status provided.');
                 return res.redirect(`/admin/edit-booking/${req.params.id}`);
             }
             booking.status = status;
         }
 
-        let currentBoatPricePerHour;
-
-        if (boatId && String(boatId) !== String(booking.boat)) {
-            const newBoat = await Boat.findById(boatId);
-            if (!newBoat) {
-                req.flash('error', 'New boat selected for booking not found.');
-                return res.redirect(`/admin/edit-booking/${req.params.id}`);
+        // Recalculate totalPrice if relevant fields changed
+        if (bookingDate || startTime || endTime || boatId) {
+            const currentBoat = await Boat.findById(booking.boat);
+            if (currentBoat && booking.startTime && booking.endTime) {
+                const startMinutes = parseInt(booking.startTime.split(':')[0]) * 60 + parseInt(booking.startTime.split(':')[1]);
+                const endMinutes = parseInt(booking.endTime.split(':')[0]) * 60 + parseInt(booking.endTime.split(':')[1]);
+                if (startMinutes < endMinutes) {
+                    const durationHours = (endMinutes - startMinutes) / 60;
+                    booking.totalPrice = durationHours * currentBoat.pricePerHour;
+                } else {
+                    req.flash('error', 'End time must be after start time for accurate price recalculation.');
+                    // Optionally set price to 0 or handle error more strictly
+                    booking.totalPrice = 0;
+                }
             }
-            booking.boat = boatId;
-            currentBoatPricePerHour = newBoat.pricePerHour;
-        } else {
-            // Populate boat if not already populated
-            if (!booking.boat || !booking.boat.pricePerHour) {
-                await booking.populate('boat');
-            }
-            currentBoatPricePerHour = booking.boat.pricePerHour;
         }
-
-        // Recalculate totalPrice based on potentially new times or boat
-        const currentStartMinutes = parseInt(booking.startTime.split(':')[0]) * 60 + parseInt(booking.startTime.split(':')[1]);
-        const currentEndMinutes = parseInt(booking.endTime.split(':')[0]) * 60 + parseInt(booking.endTime.split(':')[1]);
-
-        if (currentEndMinutes <= currentStartMinutes) {
-            req.flash('error', 'End time must be after start time.');
-            return res.redirect(`/admin/edit-booking/${req.params.id}`);
-        }
-
-        const durationHours = (currentEndMinutes - currentStartMinutes) / 60;
-        booking.totalPrice = durationHours * currentBoatPricePerHour;
 
         await booking.save();
         req.flash('success', 'Booking updated successfully!');
         res.redirect('/admin/dashboard');
-    } catch (err) {
-        console.error('Error updating booking by admin:', err);
-        req.flash('error', 'Error updating booking. Please try again.');
-        res.redirect('/admin/dashboard');
-    }
-});
 
-app.post('/admin/bookings/:id', isAuthenticated, isAdmin, async (req, res) => {
-    if (req.body._method === 'DELETE') {
-        try {
-            const bookingId = req.params.id;
-            const deletedBooking = await Booking.findByIdAndDelete(bookingId);
-
-            if (!deletedBooking) {
-                req.flash('error', 'Booking not found.');
-            } else {
-                req.flash('success', 'Booking deleted successfully.');
-            }
-            res.redirect('/admin/dashboard');
-        } catch (error) {
-            console.error('Error deleting booking by admin:', error);
-            req.flash('error', 'Error deleting booking. Please try again.');
-            res.redirect('/admin/dashboard');
-        }
-    } else {
-        res.status(405).send('Method Not Allowed');
-    }
-});
-
-// ADMIN YACHT MANAGEMENT
-
-// Get all yachts for admin view
-app.get('/admin/yachts', isAuthenticated, isAdmin, async (req, res) => {
-    try {
-        const yachts = await Boat.find({});
-        res.render('admin/yachts', { yachts });
     } catch (error) {
-        console.error('Error loading admin yachts page:', error);
-        req.flash('error', 'Could not load yachts for management.');
+        console.error('Error updating admin booking:', error);
+        req.flash('error', 'Could not update booking. An error occurred.');
+        res.redirect(`/admin/edit-booking/${req.params.id}`);
+    }
+});
+
+
+// ADMIN USER MANAGEMENT
+app.get('/admin/users', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+        const users = await User.find({});
+        res.render('admin/users', { users });
+    } catch (error) {
+        console.error('Error loading admin users page:', error);
+        req.flash('error', 'Could not load users list.');
         res.redirect('/admin/dashboard');
     }
 });
 
-// Render Add Yacht Form
-app.get('/admin/yachts/add', isAuthenticated, isAdmin, (req, res) => {
-    res.render('admin/add-yacht');
+app.post('/admin/users/:id/toggle-admin', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+        const userId = req.params.id;
+        const user = await User.findById(userId);
+
+        if (!user) {
+            req.flash('error', 'User not found.');
+            return res.redirect('/admin/users');
+        }
+
+        // Prevent admin from revoking their own admin status (optional but recommended)
+        if (user._id.toString() === req.session.userId.toString()) {
+            req.flash('error', 'You cannot change your own admin status.');
+            return res.redirect('/admin/users');
+        }
+
+        user.isAdmin = !user.isAdmin;
+        await user.save();
+        req.flash('success', `User ${user.email} admin status toggled to ${user.isAdmin}.`);
+        res.redirect('/admin/users');
+
+    } catch (error) {
+        console.error('Error toggling admin status:', error);
+        req.flash('error', 'Error toggling admin status.');
+        res.redirect('/admin/users');
+    }
 });
 
-// Handle Add Yacht Submission
-app.post('/admin/yachts/add', isAuthenticated, isAdmin, upload.single('imageUrl'), async (req, res) => {
+app.post('/admin/users/:id/delete', isAuthenticated, isAdmin, async (req, res) => {
     try {
-        const { name, display, maxPersons, pricePerHour, description } = req.body;
+        const userId = req.params.id;
+
+        // Prevent admin from deleting themselves
+        if (userId === req.session.userId.toString()) {
+            req.flash('error', 'You cannot delete your own user account.');
+            return res.redirect('/admin/users');
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            req.flash('error', 'User not found.');
+            return res.redirect('/admin/users');
+        }
+
+        // Delete all bookings associated with the user first
+        await Booking.deleteMany({ user: userId });
+
+        // Then delete the user
+        await User.findByIdAndDelete(userId);
+
+        req.flash('success', `User ${user.email} and their bookings have been deleted.`);
+        res.redirect('/admin/users');
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        req.flash('error', 'Error deleting user and associated bookings.');
+        res.redirect('/admin/users');
+    }
+});
+
+// ADMIN BOAT MANAGEMENT
+app.get('/admin/boats', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+        const boats = await Boat.find({});
+        res.render('admin/boats', { boats });
+    } catch (error) {
+        console.error('Error loading admin boats page:', error);
+        req.flash('error', 'Could not load boats list.');
+        res.redirect('/admin/dashboard');
+    }
+});
+
+// Add new boat
+app.get('/admin/boats/add', isAuthenticated, isAdmin, (req, res) => {
+    res.render('admin/add-boat');
+});
+
+app.post('/admin/boats/add', isAuthenticated, isAdmin, upload.single('imageUrl'), async (req, res) => {
+    try {
+        const { name, display, maxPersons, pricePerHour, description, availability } = req.body;
         const imageUrl = req.file ? `/images/${req.file.filename}` : '/images/default_boat.jpg';
 
         if (!name || !maxPersons || !pricePerHour) {
-            req.flash('error', 'Name, Max Persons, and Price Per Hour are required.');
-            // If file was uploaded, delete it if there's a validation error
+            // If file was uploaded but other fields are missing, delete the uploaded file
             if (req.file) {
                 fs.unlink(req.file.path, (err) => {
-                    if (err) console.error('Error deleting uploaded file:', err);
+                    if (err) console.error('Error deleting partially uploaded file:', err);
                 });
             }
-            return res.redirect('/admin/yachts/add');
-        }
-
-        // Basic validation (you can add more robust validation)
-        if (isNaN(maxPersons) || parseInt(maxPersons) < 1) {
-            req.flash('error', 'Max Persons must be a number greater than 0.');
-            if (req.file) fs.unlink(req.file.path, (err) => { if (err) console.error(err); });
-            return res.redirect('/admin/yachts/add');
-        }
-        if (isNaN(pricePerHour) || parseFloat(pricePerHour) < 0) {
-            req.flash('error', 'Price Per Hour must be a non-negative number.');
-            if (req.file) fs.unlink(req.file.path, (err) => { if (err) console.error(err); });
-            return res.redirect('/admin/yachts/add');
+            req.flash('error', 'Name, Max Persons, and Price Per Hour are required.');
+            return res.redirect('/admin/boats/add');
         }
 
         const newBoat = new Boat({
@@ -974,138 +1026,156 @@ app.post('/admin/yachts/add', isAuthenticated, isAdmin, upload.single('imageUrl'
             maxPersons: parseInt(maxPersons),
             pricePerHour: parseFloat(pricePerHour),
             imageUrl,
-            description: description || '' // Use empty string if description is empty
+            description,
+            availability: availability === 'on' ? true : false // Checkbox value
         });
 
         await newBoat.save();
-        req.flash('success', 'Yacht added successfully!');
-        res.redirect('/admin/yachts');
+        req.flash('success', 'Boat added successfully!');
+        res.redirect('/admin/boats');
     } catch (error) {
-        console.error('Error adding yacht:', error);
-        req.flash('error', 'Failed to add yacht. ' + (error.code === 11000 ? 'A yacht with this name already exists.' : error.message));
-        // If file was uploaded, delete it
+        console.error('Error adding boat:', error);
+        // If it's a duplicate key error for name, provide specific message
+        if (error.code === 11000 && error.keyPattern && error.keyPattern.name) {
+            req.flash('error', 'A boat with this name already exists.');
+        } else {
+            req.flash('error', 'Could not add boat. An unexpected error occurred.');
+        }
+        // If file was uploaded but there's a DB error, delete the file
         if (req.file) {
             fs.unlink(req.file.path, (err) => {
-                if (err) console.error('Error deleting uploaded file on save error:', err);
+                if (err) console.error('Error deleting file after DB error:', err);
             });
         }
-        res.redirect('/admin/yachts/add');
+        res.redirect('/admin/boats/add');
     }
 });
 
 
-// Render Edit Yacht Form
-app.get('/admin/yachts/edit/:id', isAuthenticated, isAdmin, async (req, res) => {
+// Edit existing boat
+app.get('/admin/boats/edit/:id', isAuthenticated, isAdmin, async (req, res) => {
     try {
-        const yacht = await Boat.findById(req.params.id);
-        if (!yacht) {
-            req.flash('error', 'Yacht not found.');
-            return res.redirect('/admin/yachts');
+        const boat = await Boat.findById(req.params.id);
+        if (!boat) {
+            req.flash('error', 'Boat not found.');
+            return res.redirect('/admin/boats');
         }
-        res.render('admin/edit-yacht', { yacht });
+        res.render('admin/edit-boat', { boat });
     } catch (error) {
-        console.error('Error loading edit yacht page:', error);
-        req.flash('error', 'Could not load yacht for editing.');
-        res.redirect('/admin/yachts');
+        console.error('Error loading edit boat page:', error);
+        req.flash('error', 'Could not load edit boat page.');
+        res.redirect('/admin/boats');
     }
 });
 
-// Handle Edit Yacht Submission
-app.post('/admin/yachts/edit/:id', isAuthenticated, isAdmin, upload.single('imageUrl'), async (req, res) => {
+app.post('/admin/boats/edit/:id', isAuthenticated, isAdmin, upload.single('imageUrl'), async (req, res) => {
     try {
         const { name, display, maxPersons, pricePerHour, description, availability } = req.body;
-        const yachtId = req.params.id;
-        const currentYacht = await Boat.findById(yachtId);
+        const boatId = req.params.id;
+        const boat = await Boat.findById(boatId);
 
-        if (!currentYacht) {
-            req.flash('error', 'Yacht not found for update.');
-            // If file was uploaded, delete it
+        if (!boat) {
+            req.flash('error', 'Boat not found.');
+            // If new file was uploaded, delete it as the boat doesn't exist
             if (req.file) {
                 fs.unlink(req.file.path, (err) => {
-                    if (err) console.error('Error deleting uploaded file on yacht not found:', err);
+                    if (err) console.error('Error deleting file for non-existent boat:', err);
                 });
             }
-            return res.redirect('/admin/yachts');
+            return res.redirect('/admin/boats');
         }
 
-        // Update fields
-        currentYacht.name = name || currentYacht.name;
-        currentYacht.display = display || name || currentYacht.display;
-        currentYacht.maxPersons = parseInt(maxPersons) || currentYacht.maxPersons;
-        currentYacht.pricePerHour = parseFloat(pricePerHour) || currentYacht.pricePerHour;
-        currentYacht.description = description !== undefined ? description : currentYacht.description; // Allow empty string
-        currentYacht.availability = (availability === 'true'); // Convert string to boolean
-
-        // Handle image update
-        if (req.file) {
-            // Delete old image if it's not the default one
-            if (currentYacht.imageUrl && currentYacht.imageUrl !== '/images/default_boat.jpg') {
-                const oldImagePath = path.join(__dirname, 'public', currentYacht.imageUrl);
-                fs.unlink(oldImagePath, (err) => {
-                    if (err) console.error('Error deleting old image:', err);
-                });
-            }
-            currentYacht.imageUrl = `/images/${req.file.filename}`;
-        }
-
-        await currentYacht.save();
-        req.flash('success', 'Yacht updated successfully!');
-        res.redirect('/admin/yachts');
-
-    } catch (error) {
-        console.error('Error updating yacht:', error);
-        req.flash('error', 'Failed to update yacht. ' + error.message);
-        // If file was uploaded, delete it
-        if (req.file) {
-            fs.unlink(req.file.path, (err) => {
-                if (err) console.error('Error deleting uploaded file on update error:', err);
+        // Delete old image if a new one is uploaded and old one is not default
+        if (req.file && boat.imageUrl && boat.imageUrl !== '/images/default_boat.jpg') {
+            const oldImagePath = path.join(__dirname, 'public', boat.imageUrl);
+            fs.unlink(oldImagePath, (err) => {
+                if (err) console.error('Error deleting old boat image:', err);
             });
         }
-        res.redirect(`/admin/yachts/edit/${req.params.id}`);
+
+        boat.name = name;
+        boat.display = display || name;
+        boat.maxPersons = parseInt(maxPersons);
+        boat.pricePerHour = parseFloat(pricePerHour);
+        boat.description = description;
+        boat.availability = availability === 'on' ? true : false;
+        if (req.file) {
+            boat.imageUrl = `/images/${req.file.filename}`;
+        }
+
+        await boat.save();
+        req.flash('success', 'Boat updated successfully!');
+        res.redirect('/admin/boats');
+
+    } catch (error) {
+        console.error('Error updating boat:', error);
+        // If there was an error and a new file was uploaded, delete it to prevent orphaned files
+        if (req.file) {
+            fs.unlink(req.file.path, (err) => {
+                if (err) console.error('Error deleting file after boat update error:', err);
+            });
+        }
+        if (error.code === 11000 && error.keyPattern && error.keyPattern.name) {
+            req.flash('error', 'A boat with this name already exists.');
+        } else {
+            req.flash('error', 'Could not update boat. An unexpected error occurred.');
+        }
+        res.redirect(`/admin/boats/edit/${req.params.id}`);
     }
 });
 
-// Handle Delete Yacht
-app.post('/admin/yachts/:id', isAuthenticated, isAdmin, async (req, res) => {
-    if (req.body._method === 'DELETE') {
-        try {
-            const yachtId = req.params.id;
-            const yacht = await Boat.findById(yachtId);
 
-            if (!yacht) {
-                req.flash('error', 'Yacht not found.');
-                return res.redirect('/admin/yachts');
-            }
+// Delete boat
+app.post('/admin/boats/:id/delete', isAuthenticated, isAdmin, async (req, res) => {
+    try {
+        const boatId = req.params.id;
+        const boat = await Boat.findById(boatId);
 
-            // Before deleting the boat, delete its image if not default
-            if (yacht.imageUrl && yacht.imageUrl !== '/images/default_boat.jpg') {
-                const imagePath = path.join(__dirname, 'public', yacht.imageUrl);
-                fs.unlink(imagePath, (err) => {
-                    if (err) console.error('Error deleting yacht image:', err);
-                });
-            }
-
-            // Optional: Handle associated bookings
-            // Decide what to do with bookings for this deleted yacht:
-            // 1. Delete them: await Booking.deleteMany({ boat: yachtId });
-            // 2. Mark them cancelled: await Booking.updateMany({ boat: yachtId }, { status: 'cancelled' });
-            // For now, we'll just delete the boat. Consider your data integrity needs.
-
-            await Boat.findByIdAndDelete(yachtId);
-            req.flash('success', 'Yacht deleted successfully!');
-            res.redirect('/admin/yachts');
-
-        } catch (error) {
-            console.error('Error deleting yacht:', error);
-            req.flash('error', 'Failed to delete yacht. ' + error.message);
-            res.redirect('/admin/yachts');
+        if (!boat) {
+            req.flash('error', 'Boat not found.');
+            return res.redirect('/admin/boats');
         }
-    } else {
-        res.status(405).send('Method Not Allowed');
+
+        // Delete associated image file if it's not the default
+        if (boat.imageUrl && boat.imageUrl !== '/images/default_boat.jpg') {
+            const imagePath = path.join(__dirname, 'public', boat.imageUrl);
+            fs.unlink(imagePath, (err) => {
+                if (err) console.error('Error deleting boat image file:', err);
+            });
+        }
+
+        // Before deleting the boat, find and remove all bookings associated with it
+        // Consider updating these bookings to null boat reference or a default boat if needed,
+        // rather than outright deleting if historical data is important.
+        await Booking.deleteMany({ boat: boatId });
+        console.log(`Deleted all bookings for boat ID: ${boatId}`);
+
+        await Boat.findByIdAndDelete(boatId);
+        req.flash('success', 'Boat and all associated bookings deleted successfully!');
+        res.redirect('/admin/boats');
+    } catch (error) {
+        console.error('Error deleting boat:', error);
+        req.flash('error', 'Error deleting boat and associated bookings.');
+        res.redirect('/admin/boats');
     }
+});
+
+
+// Fallback for undefined routes
+app.use((req, res) => {
+    res.status(404).render('404', { url: req.url });
+});
+
+
+// Error handling middleware (should be last)
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    req.flash('error', 'Something went wrong! Please try again later.');
+    res.status(500).redirect('/');
 });
 
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
+    console.log(`Your service in live at: http://localhost:${PORT}`); // This URL is only for local testing
 });
