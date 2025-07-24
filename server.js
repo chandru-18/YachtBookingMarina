@@ -77,7 +77,7 @@ bookingSchema.pre('save', function(next) {
 const Booking = mongoose.model('Booking', bookingSchema);
 
 // ===== MongoDB Connection & Default Boats ======
-mongoose.connect(process.env.MONGO_URI) // Using MONGO_URI to match your Render config
+mongoose.connect(process.env.MONGO_URI)
     .then(() => {
         console.log('MongoDB connected successfully');
         syncDefaultBoats(); // Ensure this is called only once on startup
@@ -157,7 +157,7 @@ app.use(session({
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }), // Using MONGO_URI to match your Render config
+    store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
     cookie: { maxAge: 86400000, httpOnly: true, secure: process.env.NODE_ENV === 'production' } // 24 hours
 }));
 app.use(flash());
