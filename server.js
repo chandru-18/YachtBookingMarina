@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config(); // Load environment variables from .env file
 const express = require('express');
 const mongoose = require('mongoose');
 const path = require('path');
@@ -80,6 +80,7 @@ bookingSchema.pre('save', function(next) {
 const Booking = mongoose.model('Booking', bookingSchema);
 
 // ===== MongoDB Connection & Default Boats ======
+// Ensure MONGODB_URI is correctly loaded from .env for local or from Render environment vars
 mongoose.connect(process.env.MONGODB_URI)
     .then(() => {
         console.log('MongoDB connected successfully');
@@ -160,8 +161,8 @@ app.use(session({
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    // FIX APPLIED HERE: Corrected environment variable name for MongoStore
-    store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
+    // THIS IS THE CORRECTED LINE FOR MONGOSTORE:
+    store: MongoStore.create({ mongoUrl: process.env.MONGODB_URI }),
     cookie: { maxAge: 86400000, httpOnly: true, secure: process.env.NODE_ENV === 'production' } // 24 hours
 }));
 app.use(flash());
@@ -304,10 +305,10 @@ app.post('/register', async (req, res) => {
         });
         await newUser.save();
 
-        // This URL should be dynamic based on production environment
-        const verificationUrl = `http://localhost:${PORT}/verify/${verificationToken}`;
-        // You should use the actual Render URL in production:
-        // const verificationUrl = `${req.protocol}://${req.get('host')}/verify/${verificationToken}`;
+        // Use the actual Render URL in production, localhost for local
+        const verificationUrl = process.env.NODE_ENV === 'production' ?
+                                `${req.protocol}://${req.get('host')}/verify/${verificationToken}` :
+                                `http://localhost:${PORT}/verify/${verificationToken}`;
 
         transporter.sendMail({
             to: newUser.email,
@@ -456,10 +457,10 @@ app.post('/resend-verification', async (req, res) => {
         user.verificationTokenExpires = Date.now() + 3600000; // 1 hour
         await user.save();
 
-        // This URL should be dynamic based on production environment
-        const verificationUrl = `http://localhost:${PORT}/verify/${newVerificationToken}`;
-        // You should use the actual Render URL in production:
-        // const verificationUrl = `${req.protocol}://${req.get('host')}/verify/${newVerificationToken}`;
+        // Use the actual Render URL in production, localhost for local
+        const verificationUrl = process.env.NODE_ENV === 'production' ?
+                                `${req.protocol}://${req.get('host')}/verify/${newVerificationToken}` :
+                                `http://localhost:${PORT}/verify/${newVerificationToken}`;
 
         transporter.sendMail({
             to: user.email,
@@ -498,10 +499,10 @@ app.post('/forgot', async (req, res) => {
         user.resetTokenExpires = Date.now() + 3600000; // 1 hour
         await user.save();
 
-        // This URL should be dynamic based on production environment
-        const resetUrl = `http://localhost:${PORT}/reset-password/${resetToken}`;
-        // You should use the actual Render URL in production:
-        // const resetUrl = `${req.protocol}://${req.get('host')}/reset-password/${resetToken}`;
+        // Use the actual Render URL in production, localhost for local
+        const resetUrl = process.env.NODE_ENV === 'production' ?
+                         `${req.protocol}://${req.get('host')}/reset-password/${resetToken}` :
+                         `http://localhost:${PORT}/reset-password/${resetToken}`;
 
         transporter.sendMail({
             to: user.email,
