@@ -160,6 +160,7 @@ app.use(session({
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
+    // FIX APPLIED HERE: Corrected environment variable name for MongoStore
     store: MongoStore.create({ mongoUrl: process.env.MONGODB_URI }),
     cookie: { maxAge: 86400000, httpOnly: true, secure: process.env.NODE_ENV === 'production' } // 24 hours
 }));
@@ -303,7 +304,11 @@ app.post('/register', async (req, res) => {
         });
         await newUser.save();
 
-        const verificationUrl = `http://localhost:${PORT}/verify/${verificationToken}`; // This should be your production URL
+        // This URL should be dynamic based on production environment
+        const verificationUrl = `http://localhost:${PORT}/verify/${verificationToken}`;
+        // You should use the actual Render URL in production:
+        // const verificationUrl = `${req.protocol}://${req.get('host')}/verify/${verificationToken}`;
+
         transporter.sendMail({
             to: newUser.email,
             from: process.env.EMAIL_USER,
@@ -331,30 +336,30 @@ app.get('/login', (req, res) => res.render('login'));
 
 // **MODIFIED LOGIN POST ROUTE WITH DEBUG LOGS**
 app.post('/login', async (req, res) => {
-    console.log('Attempting login...'); //
+    console.log('Attempting login...');
     try {
         const { email, password } = req.body;
-        console.log(`Login request for email: ${email}`); //
+        console.log(`Login request for email: ${email}`);
 
         const user = await User.findOne({ email });
 
         if (!user) {
-            console.log('Login failed: User not found for email:', email); //
+            console.log('Login failed: User not found for email:', email);
             req.flash('error', 'Invalid email or password.');
             return res.redirect('/login');
         }
-        console.log('Login: User found. Comparing password...'); //
+        console.log('Login: User found. Comparing password...');
         const isMatch = await bcrypt.compare(password, user.password);
 
         if (!isMatch) {
-            console.log('Login failed: Password mismatch for user:', email); //
+            console.log('Login failed: Password mismatch for user:', email);
             req.flash('error', 'Invalid email or password.');
             return res.redirect('/login');
         }
 
         // Only non-admin users need to verify email
         if (!user.isVerified && !user.isAdmin) {
-            console.log('Login failed: Email not verified for user:', email); //
+            console.log('Login failed: Email not verified for user:', email);
             req.flash('error', 'Your email is not verified. Please check your inbox or resend the verification email.');
             return res.redirect('/verify-email');
         }
@@ -367,11 +372,11 @@ app.post('/login', async (req, res) => {
             isAdmin: user.isAdmin,
             isVerified: user.isVerified
         };
-        console.log('Login successful for user:', user.email); //
+        console.log('Login successful for user:', user.email);
         req.flash('success', 'Logged in successfully!');
         res.redirect('/dashboard');
     } catch (error) {
-        console.error('Login error (catch block):', error); //
+        console.error('Login error (catch block):', error);
         req.flash('error', 'An error occurred during login.');
         res.redirect('/login');
     }
@@ -451,7 +456,11 @@ app.post('/resend-verification', async (req, res) => {
         user.verificationTokenExpires = Date.now() + 3600000; // 1 hour
         await user.save();
 
-        const verificationUrl = `http://localhost:${PORT}/verify/${newVerificationToken}`; // This should be your production URL
+        // This URL should be dynamic based on production environment
+        const verificationUrl = `http://localhost:${PORT}/verify/${newVerificationToken}`;
+        // You should use the actual Render URL in production:
+        // const verificationUrl = `${req.protocol}://${req.get('host')}/verify/${newVerificationToken}`;
+
         transporter.sendMail({
             to: user.email,
             from: process.env.EMAIL_USER,
@@ -489,7 +498,11 @@ app.post('/forgot', async (req, res) => {
         user.resetTokenExpires = Date.now() + 3600000; // 1 hour
         await user.save();
 
-        const resetUrl = `http://localhost:${PORT}/reset-password/${resetToken}`; // This should be your production URL
+        // This URL should be dynamic based on production environment
+        const resetUrl = `http://localhost:${PORT}/reset-password/${resetToken}`;
+        // You should use the actual Render URL in production:
+        // const resetUrl = `${req.protocol}://${req.get('host')}/reset-password/${resetToken}`;
+
         transporter.sendMail({
             to: user.email,
             from: process.env.EMAIL_USER,
@@ -1177,5 +1190,7 @@ app.use((err, req, res, next) => {
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
-    console.log(`Your service in live at: http://localhost:${PORT}`); // This URL is only for local testing
+    // IMPORTANT: In production on Render, use the actual domain.
+    // The localhost URL is only for local development.
+    console.log(`Your service in live at: http://localhost:${PORT}`);
 });
