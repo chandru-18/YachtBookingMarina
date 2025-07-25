@@ -702,6 +702,7 @@ app.get('/dashboard', isAuthenticated, async (req, res) => {
     try {
         const bookings = await Booking.find({ user: req.user._id }).populate('boat').sort({ bookingDate: 1, startTime: 1 });
         res.render('dashboard', {
+            pageTitle: 'Dashboard',
             user: req.user,
             bookings: bookings
         });
