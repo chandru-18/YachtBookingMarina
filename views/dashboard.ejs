@@ -1,123 +1,166 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Dashboard</title>
-    <link rel="stylesheet" href="/style.css">
+    <%- include('partials/head') %>
+    <title><%= pageTitle %></title>
+    <style>
+        .dashboard-container {
+            margin-top: 2rem;
+        }
+        .section-divider {
+            border-bottom: 1px solid #eee;
+            padding-bottom: 1rem;
+            margin-bottom: 1rem;
+        }
+        .list-group-item {
+            border: 1px solid #ddd;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            padding: 15px;
+        }
+        .badge {
+            font-size: 0.85em;
+            padding: 0.4em 0.6em;
+        }
+    </style>
 </head>
 <body>
-    <header>
-        <h1>Yacht Marina Booking</h1>
-        <p>Your Premier Destination for Yacht Rentals</p>
-        <nav>
-            <ul>
-                <li><a href="/">Home</a></li>
-                <li><a href="/dashboard">Dashboard</a></li>
-                <li><a href="/bookings">My Bookings</a></li>
-                <li><a href="/profile">Profile</a></li>
-                <% if (user && user.isAdmin) { %>
-                    <li><a href="/admin/dashboard">Admin Panel</a></li>
-                <% } %>
-                <li><a href="/logout">Logout</a></li>
-            </ul>
-        </nav>
-    </header>
+    <%- include('partials/navbar') %>
 
-    <main>
-        <div class="message-container">
-            <% if (messages.success && messages.success.length > 0) { %>
-                <div class="message success"><%= messages.success[0] %></div>
-            <% } %>
-            <% if (messages.error && messages.error.length > 0) { %>
-                <div class="message error"><%= messages.error[0] %></div>
-            <% } %>
-        </div>
+    <div class="container dashboard-container">
+        <h1 class="mb-4">Welcome, <%= user.name %>!</h1>
 
-        <section class="dashboard-section">
-            <h2>Welcome, <%= user.name %>!</h2>
-            <p>This is your personal dashboard. Here you can see a summary of your activities.</p>
+        <% if (messages.error && messages.error.length > 0) { %>
+            <div class="alert alert-danger" role="alert">
+                <%= messages.error[0] %>
+            </div>
+        <% } %>
+        <% if (messages.success && messages.success.length > 0) { %>
+            <div class="alert alert-success" role="alert">
+                <%= messages.success[0] %>
+            </div>
+        <% } %>
+        <% if (messages.info && messages.info.length > 0) { %>
+            <div class="alert alert-info" role="alert">
+                <%= messages.info[0] %>
+            </div>
+        <% } %>
 
-            <div class="dashboard-widgets">
-                <div class="widget-card">
-                    <h3>Your Total Bookings</h3>
-                    <p><%= bookings.length %></p>
-                </div>
-                <div class="widget-card">
-                    <h3>Pending Bookings</h3>
-                    <p><%= bookings.filter(b => b.status === 'pending').length %></p>
-                </div>
-                <div class="widget-card">
-                    <h3>Confirmed Bookings</h3>
-                    <p><%= bookings.filter(b => b.status === 'confirmed').length %></p>
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        User Information
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Name:</strong> <%= user.name %></p>
+                        <p><strong>Email:</strong> <%= user.email %></p>
+                        <p><strong>Admin:</strong> <%= user.isAdmin ? 'Yes' : 'No' %></p>
+                        <p><strong>Email Verified:</strong> <%= user.isVerified ? 'Yes' : 'No' %></p>
+                        <% if (!user.isVerified) { %>
+                            <p class="text-warning">Please verify your email to access all features.</p>
+                            <a href="/verify-email" class="btn btn-sm btn-warning">Verify Email</a>
+                        <% } %>
+                        <a href="/profile" class="btn btn-sm btn-info mt-2">Edit Profile</a>
+                    </div>
                 </div>
             </div>
 
-            <h3 style="margin-top: 3rem;">Upcoming Bookings</h3>
-            <%
-                const now = new Date();
-                const upcomingBookings = bookings.filter(b => {
-                    const bookingDateTime = new Date(`${b.bookingDate.toISOString().split('T')[0]}T${b.startTime}:00`);
-                    return bookingDateTime > now;
-                }).sort((a,b) => {
-                    const dateA = new Date(`${a.bookingDate.toISOString().split('T')[0]}T${a.startTime}:00`);
-                    const dateB = new Date(`${b.bookingDate.toISOString().split('T')[0]}T${b.startTime}:00`);
-                    return dateA - dateB;
-                });
-            %>
-            <% if (upcomingBookings.length > 0) { %>
-                <div class="responsive-table">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Booking ID</th>
-                                <th>Boat</th>
-                                <th>Date</th>
-                                <th>Time</th>
-                                <th>Persons</th>
-                                <th>Price</th>
-                                <th>Status</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <% upcomingBookings.forEach(booking => { %>
-                                <tr>
-                                    <td><%= booking._id.toString().slice(-6) %></td>
-                                    <td><%= booking.boat.display || booking.boat.name %></td>
-                                    <td><%= booking.bookingDate.toLocaleDateString() %></td>
-                                    <td><%= booking.startTime %> - <%= booking.endTime %></td>
-                                    <td><%= booking.numberOfPersons %></td>
-                                    <td>د.إ <%= booking.totalPrice %></td>
-                                    <td><span class="status-badge status-<%= booking.status %>"><%= booking.status %></span></td>
-                                    <td>
-                                        <% if (booking.status === 'pending' || booking.status === 'confirmed') { %>
-                                            <form action="/bookings/<%= booking._id %>" method="POST" style="display:inline;">
-                                                <input type="hidden" name="status" value="cancelled">
-                                                <button type="submit" class="btn btn-danger btn-small" onclick="return confirm('Are you sure you want to cancel this booking?');">Cancel</button>
-                                            </form>
-                                        <% } else { %>
-                                            <span class="text-muted">No actions</span>
-                                        <% } %>
-                                    </td>
-                                </tr>
-                            <% }) %>
-                        </tbody>
-                    </table>
+            <div class="col-md-6 mb-4">
+                <div class="card">
+                    <div class="card-header">
+                        Quick Actions
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <a href="/" class="btn btn-primary">Book a New Yacht</a>
+                            <a href="/bookings" class="btn btn-secondary">View All My Bookings</a>
+                            <% if (user.isAdmin) { %>
+                                <a href="/admin/dashboard" class="btn btn-danger">Go to Admin Panel</a>
+                            <% } %>
+                            <a href="/logout" class="btn btn-outline-danger">Logout</a>
+                        </div>
+                    </div>
                 </div>
-            <% } else { %>
-                <p class="text-center">You have no upcoming bookings.</p>
-                <p class="text-center"><a href="/" class="btn btn-primary">Book a Yacht Now!</a></p>
-            <% } %>
+            </div>
+        </div>
 
-            <p style="margin-top: 3rem; text-align: center;"><a href="/bookings">View All My Bookings (Past & Future)</a></p>
-        </section>
-    </main>
+        <div class="section-divider mt-4"></div>
 
-    <footer>
-        <p>&copy; <%= new Date().getFullYear() %> Yacht Marina Booking. All rights reserved.</p>
-    </footer>
+        <h3 style="margin-top: 3rem;">Upcoming Bookings</h3>
+        <%
+            const now = new Date();
+            const upcomingBookings = bookings.filter(b => {
+                // ADDED CHECK: Ensure b.bookingDate is not null or undefined
+                if (!b.bookingDate) {
+                    // console.warn('Booking without bookingDate found:', b._id); // Uncomment for debugging if needed
+                    return false; // Exclude this booking if date is missing
+                }
+                const bookingDateTime = new Date(`${b.bookingDate.toISOString().split('T')[0]}T${b.startTime}:00`);
+                return bookingDateTime >= now;
+            });
+        %>
+        <% if (upcomingBookings.length > 0) { %>
+            <ul class="list-group mb-4">
+                <% upcomingBookings.forEach(booking => { %>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong><%= booking.boat.name %></strong>
+                            <p class="mb-0">Date: <%= new Date(booking.bookingDate).toLocaleDateString() %></p>
+                            <p class="mb-0">Time: <%= booking.startTime %> - <%= booking.endTime %></p>
+                            <p class="mb-0">Persons: <%= booking.numberOfPersons %></p>
+                            <p class="mb-0">Total Price: ₹<%= booking.totalPrice.toFixed(2) %></p>
+                            <p class="mb-0">Status: <span class="badge bg-<%= booking.status === 'confirmed' ? 'success' : (booking.status === 'pending' ? 'warning' : 'secondary') %>"><%= booking.status %></span></p>
+                        </div>
+                        <div>
+                            <% if (booking.status === 'pending' || booking.status === 'confirmed') { %>
+                                <form action="/bookings/<%= booking._id %>?_method=POST" method="POST" style="display:inline;">
+                                    <input type="hidden" name="status" value="cancelled">
+                                    <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to cancel this booking?');">Cancel</button>
+                                </form>
+                            <% } %>
+                        </div>
+                    </li>
+                <% }); %>
+            </ul>
+        <% } else { %>
+            <p>No upcoming bookings found.</p>
+        <% } %>
 
-    <script src="/script.js"></script>
+        <div class="section-divider mt-4"></div>
+
+        <h3 style="margin-top: 3rem;">Past Bookings</h3>
+        <%
+            const pastBookings = bookings.filter(b => {
+                // ADDED CHECK: Ensure b.bookingDate is not null or undefined
+                if (!b.bookingDate) {
+                    return false; // Exclude this booking if date is missing
+                }
+                const bookingDateTime = new Date(`${b.bookingDate.toISOString().split('T')[0]}T${b.startTime}:00`);
+                return bookingDateTime < now;
+            });
+        %>
+        <% if (pastBookings.length > 0) { %>
+            <ul class="list-group">
+                <% pastBookings.forEach(booking => { %>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong><%= booking.boat.name %></strong>
+                            <p class="mb-0">Date: <%= new Date(booking.bookingDate).toLocaleDateString() %></p>
+                            <p class="mb-0">Time: <%= booking.startTime %> - <%= booking.endTime %></p>
+                            <p class="mb-0">Persons: <%= booking.numberOfPersons %></p>
+                            <p class="mb-0">Total Price: ₹<%= booking.totalPrice.toFixed(2) %></p>
+                            <p class="mb-0">Status: <span class="badge bg-<%= booking.status === 'completed' ? 'info' : (booking.status === 'cancelled' ? 'danger' : 'secondary') %>"><%= booking.status %></span></p>
+                        </div>
+                    </li>
+                <% }); %>
+            </ul>
+        <% } else { %>
+            <p>No past bookings found.</p>
+        <% } %>
+    </div>
+
+    <%- include('partials/footer') %>
+    <%- include('partials/scripts') %>
 </body>
 </html>
