@@ -1,51 +1,70 @@
-require('dotenv').config();
+require('dotenv').config(); // MUST BE AT THE VERY TOP to load environment variables [cite: 57, 66]
+
 const express = require('express');
 const mongoose = require('mongoose');
 const path = require('path');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
-const flash = require('connect-flash');
+const flash = require('express-flash'); // MODIFIED: Changed from connect-flash to express-flash
 const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const methodOverride = require('method-override');
-const multer = require('multer'); // For file uploads
-const fs = require('fs'); // For deleting files
+const multer = require('multer');
+const fs = require('fs');
+const passport = require('passport'); // NEW: Added Passport.js
+const GoogleStrategy = require('passport-google-oauth20').Strategy; // NEW: Added Google Strategy
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ====== MongoDB Connection =======
+mongoose.connect(process.env.MONGO_URI)
+    .then(() => {
+        console.log('MongoDB connected successfully');
+        syncDefaultBoats();
+    })
+    .catch(err => console.error('MongoDB connection error:', err));
+
 // ====== Models =======
+
+// User Schema (with googleId added and password not required)
 const userSchema = new mongoose.Schema({
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    password: { type: String, required: true },
+    password: { type: String }, // MODIFIED: password is NOT required for Google-only users 
     isAdmin: { type: Boolean, default: false },
     isVerified: { type: Boolean, default: false },
     verificationToken: String,
     verificationTokenExpires: Date,
     resetToken: String,
-    resetTokenExpires: Date
+    resetTokenExpires: Date,
+    googleId: { type: String, unique: true, sparse: true } // NEW: Added for Google OAuth
 });
+
+// Hash password before saving
 userSchema.pre('save', async function(next) {
-    if (this.isModified('password')) {
+    if (this.isModified('password') && this.password) { // Only hash if password is set and modified
         this.password = await bcrypt.hash(this.password, 10);
     }
     next();
 });
+
 const User = mongoose.model('User', userSchema);
 
+// Boat Schema
 const boatSchema = new mongoose.Schema({
     name: { type: String, required: true, unique: true, trim: true },
     display: { type: String, trim: true },
     maxPersons: { type: Number, required: true, min: 1 },
     pricePerHour: { type: Number, required: true, min: 0 },
     imageUrl: { type: String, default: '/images/default_boat.jpg', trim: true },
-    description: { type: String, trim: true, default: '' }, // NEW FIELD
+    description: { type: String, trim: true, default: '' },
     availability: { type: Boolean, default: true }
 });
 const Boat = mongoose.model('Boat', boatSchema);
 
+// Booking Schema
 const bookingSchema = new mongoose.Schema({
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     boat: { type: mongoose.Schema.Types.ObjectId, ref: 'Boat', required: true },
@@ -157,15 +176,85 @@ app.use(session({
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
-    cookie: { maxAge: 86400000, httpOnly: true, secure: process.env.NODE_ENV === 'production' } // 24 hours
+    store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }), // Ensure MONGO_URI is correct [cite: 89, 90]
+    cookie: { maxAge: 86400000, httpOnly: true, secure: process.env.NODE_ENV === 'production' } // 24 hours [cite: 73]
 }));
 app.use(flash());
+
+// NEW: Passport.js Setup
+app.use(passport.initialize());
+app.use(passport.session());
+
+// NEW: Passport.js Serialize and Deserialize User
+// These functions determine what user data to store in the session (serialize)
+// and how to retrieve the user from the database given that data (deserialize).
+passport.serializeUser((user, done) => {
+    done(null, user.id); // Store only the user ID in the session
+});
+
+passport.deserializeUser(async (id, done) => {
+    try {
+        const user = await User.findById(id);
+        done(null, user); // Retrieve the full user object from the database
+    } catch (err) {
+        done(err, null);
+    }
+});
+
+// NEW: Google Strategy Configuration
+passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: process.env.NODE_ENV === 'production' ?
+                 "https://yachtmarinabooking.onrender.com/auth/google/callback" :
+                 "http://localhost:3000/auth/google/callback",
+    scope: ['profile', 'email'] // Request access to profile and email
+},
+async (accessToken, refreshToken, profile, done) => {
+    try {
+        let user = await User.findOne({ googleId: profile.id });
+
+        if (user) {
+            // User already exists, update their profile if necessary (e.g., name, email)
+            if (user.email !== profile.emails[0].value) {
+                user.email = profile.emails[0].value;
+                await user.save();
+            }
+            return done(null, user);
+        } else {
+            // Check if a user with this email already exists but without a Google ID
+            user = await User.findOne({ email: profile.emails[0].value });
+
+            if (user) {
+                // Link existing account with Google ID
+                user.googleId = profile.id;
+                user.isVerified = true; // Google accounts are implicitly verified
+                await user.save();
+                return done(null, user);
+            } else {
+                // New user via Google
+                const newUser = new User({
+                    googleId: profile.id,
+                    name: profile.displayName,
+                    email: profile.emails[0].value,
+                    isVerified: true // Google accounts are implicitly verified
+                    // No password field set for Google-only users
+                });
+                await newUser.save();
+                return done(null, newUser);
+            }
+        }
+    } catch (err) {
+        return done(err, null);
+    }
+}));
+
 
 // Make flash messages and user data available to all templates
 app.use((req, res, next) => {
     res.locals.messages = req.flash();
-    res.locals.user = req.session.user || null;
+    // MODIFIED: Use Passport's req.user for current user, fallback to session.user
+    res.locals.user = req.user || req.session.user || null;
     next();
 });
 
@@ -181,50 +270,35 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-// ===== Auth Middleware =====
+// ===== Auth Middleware (MODIFIED for Passport.js) =====
 const isAuthenticated = (req, res, next) => {
-    if (!req.session.userId) {
-        req.flash('error', 'Please log in to access this page.');
-        return res.redirect('/login');
-    }
-
-    User.findById(req.session.userId)
-        .then(user => {
-            if (!user) {
-                req.flash('error', 'User not found. Please log in again.');
-                req.session.destroy(err => {
-                    if(err) console.error('Error destroying session during isAuthenticated:', err);
-                    res.clearCookie('connect.sid');
-                    res.redirect('/login');
-                });
-                return;
-            }
-
-            // Admins bypass email verification
-            if (!user.isVerified && !user.isAdmin && req.path !== '/verify-email' && req.path !== '/resend-verification' && req.path !== '/logout' && req.path.indexOf('/verify/') === -1) {
-                req.flash('error', 'Please verify your email to access this feature.');
-                return res.redirect('/verify-email');
-            }
-
-            // This ensures req.session.user is always up-to-date with current DB status
+    // Passport adds req.isAuthenticated() and req.user
+    if (req.isAuthenticated()) {
+        // If user is authenticated via Passport, ensure session.user is populated for backward compatibility
+        // or just rely on req.user going forward.
+        if (!req.session.user) {
             req.session.user = {
-                id: user._id,
-                name: user.name,
-                email: user.email,
-                isAdmin: user.isAdmin,
-                isVerified: user.isVerified
+                id: req.user._id,
+                name: req.user.name,
+                email: req.user.email,
+                isAdmin: req.user.isAdmin,
+                isVerified: req.user.isVerified
             };
-            next();
-        })
-        .catch(err => {
-            console.error('Error in isAuthenticated middleware:', err);
-            req.flash('error', 'An authentication error occurred. Please log in again.');
-            res.redirect('/login');
-        });
+        }
+        // Admins bypass email verification
+        if (!req.user.isVerified && !req.user.isAdmin && req.path !== '/verify-email' && req.path !== '/resend-verification' && req.path !== '/logout' && req.path.indexOf('/verify/') === -1 && req.path.indexOf('/auth/google') === -1) {
+            req.flash('error', 'Please verify your email to access this feature.');
+            return res.redirect('/verify-email');
+        }
+        return next();
+    }
+    req.flash('error', 'Please log in to access this page.');
+    res.redirect('/login');
 };
 
 const isAdmin = (req, res, next) => {
-    if (req.session.user && req.session.user.isAdmin) {
+    // MODIFIED: Check Passport's req.user for admin status
+    if (req.isAuthenticated() && req.user.isAdmin) {
         return next();
     }
     req.flash('error', 'Access denied. Administrator privileges required.');
@@ -328,14 +402,18 @@ app.post('/register', async (req, res) => {
     }
 });
 
-// Login/Logout
+// Login/Logout (MODIFIED for Passport.js)
 app.get('/login', (req, res) => res.render('login'));
-app.post('/login', async (req, res) => {
+
+// Standard login using Passport's local strategy (if you implement it, otherwise this remains as is for now)
+app.post('/login', async (req, res, next) => {
+    // Note: If you implement a 'local' strategy with Passport, this section would change
+    // to `passport.authenticate('local', { ... })`. For now, it remains as direct check.
     try {
         const { email, password } = req.body;
         const user = await User.findOne({ email });
 
-        if (!user || !(await bcrypt.compare(password, user.password))) {
+        if (!user || !(user.password && await bcrypt.compare(password, user.password))) { // Check if user has a password before comparing
             req.flash('error', 'Invalid email or password.');
             return res.redirect('/login');
         }
@@ -345,16 +423,16 @@ app.post('/login', async (req, res) => {
             return res.redirect('/verify-email');
         }
 
-        req.session.userId = user._id;
-        req.session.user = {
-            id: user._id,
-            name: user.name,
-            email: user.email,
-            isAdmin: user.isAdmin,
-            isVerified: user.isVerified
-        };
-        req.flash('success', 'Logged in successfully!');
-        res.redirect('/dashboard');
+        // Manually log in the user via Passport if successful with traditional login
+        req.login(user, (err) => {
+            if (err) {
+                console.error('Passport login error:', err);
+                req.flash('error', 'An error occurred during login.');
+                return res.redirect('/login');
+            }
+            req.flash('success', 'Logged in successfully!');
+            res.redirect('/dashboard');
+        });
     } catch (error) {
         console.error('Login error:', error);
         req.flash('error', 'An error occurred during login.');
@@ -362,27 +440,47 @@ app.post('/login', async (req, res) => {
     }
 });
 
-app.get('/logout', (req, res) => {
-    if (req.session) {
-        req.flash('success', 'You have been logged out successfully.');
 
-        req.session.destroy(err => {
+app.get('/logout', (req, res, next) => {
+    // MODIFIED: Use Passport's req.logout()
+    req.logout((err) => { // Passport's logout function
+        if (err) {
+            console.error('Error logging out:', err);
+            return next(err);
+        }
+        req.session.destroy(err => { // Destroy session after Passport logout
             if (err) {
                 console.error('Error destroying session:', err);
-                return res.redirect('/');
             }
             res.clearCookie('connect.sid');
+            req.flash('success', 'You have been logged out successfully.');
             res.redirect('/login');
         });
-    } else {
-        res.clearCookie('connect.sid');
-        res.redirect('/login');
-    }
+    });
 });
+
+
+// NEW: Google OAuth Routes
+app.get('/auth/google',
+    passport.authenticate('google', { scope: ['profile', 'email'] })
+);
+
+app.get('/auth/google/callback',
+    passport.authenticate('google', {
+        failureRedirect: '/login',
+        failureFlash: true // Display flash messages on failure
+    }),
+    (req, res) => {
+        // Successful authentication, redirect home or dashboard.
+        req.flash('success', 'Logged in successfully with Google!');
+        res.redirect('/dashboard');
+    }
+);
+
 
 // Email Verification Routes
 app.get('/verify-email', isAuthenticated, (req, res) => {
-    res.render('verify-email', { user: req.session.user });
+    res.render('verify-email', { user: req.user }); // MODIFIED: Use req.user
 });
 
 app.get('/verify/:token', async (req, res) => {
@@ -413,7 +511,7 @@ app.get('/verify/:token', async (req, res) => {
 
 app.post('/resend-verification', async (req, res) => {
     try {
-        const emailToResend = req.session.user ? req.session.user.email : req.body.email;
+        const emailToResend = req.user ? req.user.email : req.body.email; // MODIFIED: Use req.user
 
         if (!emailToResend) {
             req.flash('error', 'No email provided for resending verification.');
@@ -567,9 +665,10 @@ app.post('/reset-password/:token', async (req, res) => {
 // User Dashboard
 app.get('/dashboard', isAuthenticated, async (req, res) => {
     try {
-        const bookings = await Booking.find({ user: req.session.userId }).populate('boat').sort({ bookingDate: 1, startTime: 1 });
+        // MODIFIED: Use req.user._id
+        const bookings = await Booking.find({ user: req.user._id }).populate('boat').sort({ bookingDate: 1, startTime: 1 });
         res.render('dashboard', {
-            user: req.session.user,
+            user: req.user, // MODIFIED: Use req.user
             bookings: bookings
         });
     } catch (err) {
@@ -698,7 +797,7 @@ app.post('/book', isAuthenticated, async (req, res) => {
         }
 
         const newBooking = new Booking({
-            user: req.session.userId,
+            user: req.user._id, // MODIFIED: Use req.user._id
             boat: boatId,
             bookingDate: parsedBookingDate,
             startTime,
@@ -722,7 +821,7 @@ app.post('/book', isAuthenticated, async (req, res) => {
 // User's All Bookings
 app.get('/bookings', isAuthenticated, async (req, res) => {
     try {
-        const bookings = await Booking.find({ user: req.session.userId }).populate('boat').sort({ bookingDate: 1, startTime: 1 });
+        const bookings = await Booking.find({ user: req.user._id }).populate('boat').sort({ bookingDate: 1, startTime: 1 }); // MODIFIED: Use req.user._id
         res.render('user-bookings', { bookings });
     } catch (error) {
         console.error('Error loading user bookings:', error);
@@ -737,7 +836,7 @@ app.post('/bookings/:id', isAuthenticated, async (req, res) => {
         const { status } = req.body;
         const bookingId = req.params.id;
 
-        const booking = await Booking.findOne({ _id: bookingId, user: req.session.userId });
+        const booking = await Booking.findOne({ _id: bookingId, user: req.user._id }); // MODIFIED: Use req.user._id
 
         if (!booking) {
             req.flash('error', 'Booking not found or you do not have permission to modify it.');
@@ -764,13 +863,14 @@ app.post('/bookings/:id', isAuthenticated, async (req, res) => {
 // Profile
 app.get('/profile', isAuthenticated, async (req, res) => {
     try {
-        const user = await User.findById(req.session.userId);
+        const user = await User.findById(req.user._id); // MODIFIED: Use req.user._id
         if (!user) {
             req.flash('error', 'User profile not found. Please log in again.');
             return res.redirect('/login');
         }
         res.render('profile', { user });
-    } catch (error) {
+    }
+    catch (error) {
         console.error('Error loading profile page:', error);
         req.flash('error', 'Could not load your profile.');
         res.redirect('/dashboard');
