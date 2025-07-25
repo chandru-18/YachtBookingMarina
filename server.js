@@ -10,7 +10,7 @@ const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const methodOverride = require('method-override');
 const multer = require('multer');
-const fs = require('fs');
+const fs = require('fs'); // Added for file system operations (deleting old images)
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 
@@ -60,7 +60,11 @@ const boatSchema = new mongoose.Schema({
     display: { type: String, trim: true },
     maxPersons: { type: Number, required: true, min: 1 },
     pricePerHour: { type: Number, required: true, min: 0 },
-    imageUrl: { type: String, default: '/images/default_boat.jpg', trim: true },
+    // MODIFIED: Changed imageUrl to imageUrls to store an array of strings
+    imageUrls: {
+        type: [String], // Array of strings
+        default: ['/images/default_boat.jpg'] // Default to an array with one default image
+    },
     description: { type: String, trim: true, default: '' },
     availability: { type: Boolean, default: true }
 });
@@ -100,10 +104,10 @@ const Booking = mongoose.model('Booking', bookingSchema);
 // ===== MongoDB Connection & Default Boats ======
 async function syncDefaultBoats() {
     const defaultBoats = [
-        { name: "ORYX 46 ft", display: "ORYX 46 ft", maxPersons: 15, pricePerHour: 500, imageUrl: "/images/oryx_46ft.jpg", description: "A luxurious and spacious yacht, perfect for larger groups." },
-        { name: "Majesty 56 ft", display: "Majesty 56 ft", maxPersons: 20, pricePerHour: 800, imageUrl: "/images/majesty_56ft.jpg", description: "Experience ultimate luxury on this grand yacht, ideal for events." },
-        { name: "Fishing/Speed Boat 31 ft", display: "Fishing/Speed Boat 31 ft", maxPersons: 10, pricePerHour: 349, imageUrl: "/images/fishing_speed_31ft.jpg", description: "Fast and versatile, great for fishing trips or quick cruises." },
-        { name: "ORYX 36 ft", display: "ORYX 36 ft", maxPersons: 10, pricePerHour: 400, imageUrl: "/images/oryx_36ft.jpg", description: "A comfortable and stylish yacht, suitable for family outings." }
+        { name: "ORYX 46 ft", display: "ORYX 46 ft", maxPersons: 15, pricePerHour: 500, imageUrls: ["/images/oryx_46ft.jpg"], description: "A luxurious and spacious yacht, perfect for larger groups." },
+        { name: "Majesty 56 ft", display: "Majesty 56 ft", maxPersons: 20, pricePerHour: 800, imageUrls: ["/images/majesty_56ft.jpg"], description: "Experience ultimate luxury on this grand yacht, ideal for events." },
+        { name: "Fishing/Speed Boat 31 ft", display: "Fishing/Speed Boat 31 ft", maxPersons: 10, pricePerHour: 349, imageUrls: ["/images/fishing_speed_31ft.jpg"], description: "Fast and versatile, great for fishing trips or quick cruises." },
+        { name: "ORYX 36 ft", display: "ORYX 36 ft", maxPersons: 10, pricePerHour: 400, imageUrls: ["/images/oryx_36ft.jpg"], description: "A comfortable and stylish yacht, suitable for family outings." }
     ];
 
     const desiredBoatNames = defaultBoats.map(boat => boat.name);
@@ -144,7 +148,10 @@ app.use(methodOverride('_method')); // For PUT/DELETE methods in forms
 // Set up Multer for file uploads
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, 'public/images/'); // Save uploaded images to public/images folder
+        const uploadPath = path.join(__dirname, 'public/uploads'); // Changed to public/uploads
+        // Create the directory if it doesn't exist
+        fs.mkdirSync(uploadPath, { recursive: true });
+        cb(null, uploadPath);
     },
     filename: function (req, file, cb) {
         // Use a unique filename to prevent conflicts
@@ -165,6 +172,10 @@ const upload = multer({
         }
     }
 });
+
+// NEW: Uploader for multiple files, up to 5
+const uploadMultiple = multer({ storage: storage, limits: { fileSize: 5 * 1024 * 1024 } }).array('images', 5);
+
 
 // IMPORTANT: Trust the Render proxy headers for secure cookies and correct protocol
 app.set('trust proxy', 1);
@@ -208,6 +219,7 @@ passport.deserializeUser(async (id, done) => {
 passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    // MODIFIED: Hardcoded callbackURL for Render to ensure consistency
     callbackURL: `https://yachtmarinabooking.onrender.com/auth/google/callback`,
     scope: ['profile', 'email'] // Request access to profile and email
 },
@@ -1087,58 +1099,80 @@ app.get('/admin/yachts/add', isAuthenticated, isAdmin, (req, res) => {
     res.render('admin/add-yacht');
 });
 
-// Handle Add Yacht Submission
-app.post('/admin/yachts/add', isAuthenticated, isAdmin, upload.single('imageUrl'), async (req, res) => {
-    try {
-        const { name, display, maxPersons, pricePerHour, description } = req.body;
-        const imageUrl = req.file ? `/images/${req.file.filename}` : '/images/default_boat.jpg';
+// Handle Add Yacht Submission (MODIFIED for multiple images)
+app.post('/admin/yachts/add', isAuthenticated, isAdmin, (req, res) => {
+    uploadMultiple(req, res, async (err) => { // Use uploadMultiple
+        if (err instanceof multer.MulterError) {
+            // A Multer error occurred when uploading.
+            req.flash('error', 'Image upload error: ' + err.message);
+            return res.redirect('/admin/yachts/add');
+        } else if (err) {
+            // An unknown error occurred when uploading.
+            req.flash('error', 'An unknown error occurred during image upload: ' + err.message);
+            return res.redirect('/admin/yachts/add');
+        }
 
-        if (!name || !maxPersons || !pricePerHour) {
-            req.flash('error', 'Name, Max Persons, and Price Per Hour are required.');
-            // If file was uploaded, delete it if there's a validation error
-            if (req.file) {
-                fs.unlink(req.file.path, (err) => {
-                    if (err) console.error('Error deleting uploaded file:', err);
+        try {
+            const { name, display, maxPersons, pricePerHour, description } = req.body;
+            let imageUrls = []; // Use imageUrls array
+
+            if (req.files && req.files.length > 0) {
+                imageUrls = req.files.map(file => '/uploads/' + file.filename);
+            } else {
+                imageUrls = ['/images/default_boat.jpg']; // Default if no files uploaded
+            }
+
+            if (!name || !maxPersons || !pricePerHour) {
+                req.flash('error', 'Name, Max Persons, and Price Per Hour are required.');
+                // If files were uploaded, delete them if there's a validation error
+                if (req.files && req.files.length > 0) {
+                    req.files.forEach(file => {
+                        fs.unlink(file.path, (err) => {
+                            if (err) console.error('Error deleting uploaded file:', err);
+                        });
+                    });
+                }
+                return res.redirect('/admin/yachts/add');
+            }
+
+            // Basic validation (you can add more robust validation)
+            if (isNaN(maxPersons) || parseInt(maxPersons) < 1) {
+                req.flash('error', 'Max Persons must be a number greater than 0.');
+                if (req.files) req.files.forEach(file => { fs.unlink(file.path, (err) => { if (err) console.error(err); }); });
+                return res.redirect('/admin/yachts/add');
+            }
+            if (isNaN(pricePerHour) || parseFloat(pricePerHour) < 0) {
+                req.flash('error', 'Price Per Hour must be a non-negative number.');
+                if (req.files) req.files.forEach(file => { fs.unlink(file.path, (err) => { if (err) console.error(err); }); });
+                return res.redirect('/admin/yachts/add');
+            }
+
+            const newBoat = new Boat({
+                name,
+                display: display || name, // Use name if display is empty
+                maxPersons: parseInt(maxPersons),
+                pricePerHour: parseFloat(pricePerHour),
+                imageUrls, // Use imageUrls (array)
+                description: description || '' // Use empty string if description is empty
+            });
+
+            await newBoat.save();
+            req.flash('success', 'Yacht added successfully!');
+            res.redirect('/admin/yachts');
+        } catch (error) {
+            console.error('Error adding yacht:', error);
+            req.flash('error', 'Failed to add yacht. ' + (error.code === 11000 ? 'A yacht with this name already exists.' : error.message));
+            // If files were uploaded, delete them
+            if (req.files) {
+                req.files.forEach(file => {
+                    fs.unlink(file.path, (err) => {
+                        if (err) console.error('Error deleting uploaded file on save error:', err);
+                    });
                 });
             }
-            return res.redirect('/admin/yachts/add');
+            res.redirect('/admin/yachts/add');
         }
-
-        // Basic validation (you can add more robust validation)
-        if (isNaN(maxPersons) || parseInt(maxPersons) < 1) {
-            req.flash('error', 'Max Persons must be a number greater than 0.');
-            if (req.file) fs.unlink(req.file.path, (err) => { if (err) console.error(err); });
-            return res.redirect('/admin/yachts/add');
-        }
-        if (isNaN(pricePerHour) || parseFloat(pricePerHour) < 0) {
-            req.flash('error', 'Price Per Hour must be a non-negative number.');
-            if (req.file) fs.unlink(req.file.path, (err) => { if (err) console.error(err); });
-            return res.redirect('/admin/yachts/add');
-        }
-
-        const newBoat = new Boat({
-            name,
-            display: display || name, // Use name if display is empty
-            maxPersons: parseInt(maxPersons),
-            pricePerHour: parseFloat(pricePerHour),
-            imageUrl,
-            description: description || '' // Use empty string if description is empty
-        });
-
-        await newBoat.save();
-        req.flash('success', 'Yacht added successfully!');
-        res.redirect('/admin/yachts');
-    } catch (error) {
-        console.error('Error adding yacht:', error);
-        req.flash('error', 'Failed to add yacht. ' + (error.code === 11000 ? 'A yacht with this name already exists.' : error.message));
-        // If file was uploaded, delete it
-        if (req.file) {
-            fs.unlink(req.file.path, (err) => {
-                if (err) console.error('Error deleting uploaded file on save error:', err);
-            });
-        }
-        res.redirect('/admin/yachts/add');
-    }
+    });
 });
 
 
@@ -1158,59 +1192,77 @@ app.get('/admin/yachts/edit/:id', isAuthenticated, isAdmin, async (req, res) => 
     }
 });
 
-// Handle Edit Yacht Submission
-app.post('/admin/yachts/edit/:id', isAuthenticated, isAdmin, upload.single('imageUrl'), async (req, res) => {
-    try {
-        const { name, display, maxPersons, pricePerHour, description, availability } = req.body;
-        const yachtId = req.params.id;
-        const currentYacht = await Boat.findById(yachtId);
+// Handle Edit Yacht Submission (MODIFIED for multiple images)
+app.post('/admin/yachts/edit/:id', isAuthenticated, isAdmin, (req, res) => {
+    uploadMultiple(req, res, async (err) => { // Use uploadMultiple
+        if (err instanceof multer.MulterError) {
+            req.flash('error', 'Image upload error: ' + err.message);
+            return res.redirect(`/admin/yachts/edit/${req.params.id}`);
+        } else if (err) {
+            req.flash('error', 'An unknown error occurred during image upload: ' + err.message);
+            return res.redirect(`/admin/yachts/edit/${req.params.id}`);
+        }
 
-        if (!currentYacht) {
-            req.flash('error', 'Yacht not found for update.');
-            // If file was uploaded, delete it
-            if (req.file) {
-                fs.unlink(req.file.path, (err) => {
-                    if (err) console.error('Error deleting uploaded file on yacht not found:', err);
+        try {
+            const { name, display, maxPersons, pricePerHour, description, availability } = req.body;
+            const yachtId = req.params.id;
+            const currentYacht = await Boat.findById(yachtId);
+
+            if (!currentYacht) {
+                req.flash('error', 'Yacht not found for update.');
+                // If files were uploaded, delete them
+                if (req.files) {
+                    req.files.forEach(file => {
+                        fs.unlink(file.path, (err) => {
+                            if (err) console.error('Error deleting uploaded file on yacht not found:', err);
+                        });
+                    });
+                }
+                return res.redirect('/admin/yachts');
+            }
+
+            // Update fields
+            currentYacht.name = name || currentYacht.name;
+            currentYacht.display = display || name || currentYacht.display;
+            currentYacht.maxPersons = parseInt(maxPersons) || currentYacht.maxPersons;
+            currentYacht.pricePerHour = parseFloat(pricePerHour) || currentYacht.pricePerHour;
+            currentYacht.description = description !== undefined ? description : currentYacht.description; // Allow empty string
+            currentYacht.availability = (availability === 'true'); // Convert string to boolean
+
+            // Handle image updates - if new files are uploaded, replace existing ones
+            if (req.files && req.files.length > 0) {
+                // Delete old images (if they are not default)
+                currentYacht.imageUrls.forEach(oldUrl => {
+                    if (oldUrl && oldUrl !== '/images/default_boat.jpg') {
+                        const oldImagePath = path.join(__dirname, 'public', oldUrl);
+                        fs.unlink(oldImagePath, (err) => {
+                            if (err) console.error('Error deleting old image:', err);
+                        });
+                    }
+                });
+                // Set new image URLs
+                currentYacht.imageUrls = req.files.map(file => '/uploads/' + file.filename); // Changed from /images/ to /uploads/
+            }
+            // If no new files uploaded, keep existing imageUrls (do nothing here)
+
+            await currentYacht.save();
+            req.flash('success', 'Yacht updated successfully!');
+            res.redirect('/admin/yachts');
+
+        } catch (error) {
+            console.error('Error updating yacht:', error);
+            req.flash('error', 'Failed to update yacht. ' + error.message);
+            // If files were uploaded, delete them
+            if (req.files) {
+                req.files.forEach(file => {
+                    fs.unlink(file.path, (err) => {
+                        if (err) console.error('Error deleting uploaded file on update error:', err);
+                    });
                 });
             }
-            return res.redirect('/admin/yachts');
+            res.redirect(`/admin/yachts/edit/${req.params.id}`);
         }
-
-        // Update fields
-        currentYacht.name = name || currentYacht.name;
-        currentYacht.display = display || name || currentYacht.display;
-        currentYacht.maxPersons = parseInt(maxPersons) || currentYacht.maxPersons;
-        currentYacht.pricePerHour = parseFloat(pricePerHour) || currentYacht.pricePerHour;
-        currentYacht.description = description !== undefined ? description : currentYacht.description; // Allow empty string
-        currentYacht.availability = (availability === 'true'); // Convert string to boolean
-
-        // Handle image update
-        if (req.file) {
-            // Delete old image if it's not the default one
-            if (currentYacht.imageUrl && currentYacht.imageUrl !== '/images/default_boat.jpg') {
-                const oldImagePath = path.join(__dirname, 'public', currentYacht.imageUrl);
-                fs.unlink(oldImagePath, (err) => {
-                    if (err) console.error('Error deleting old image:', err);
-                });
-            }
-            currentYacht.imageUrl = `/images/${req.file.filename}`;
-        }
-
-        await currentYacht.save();
-        req.flash('success', 'Yacht updated successfully!');
-        res.redirect('/admin/yachts');
-
-    } catch (error) {
-        console.error('Error updating yacht:', error);
-        req.flash('error', 'Failed to update yacht. ' + error.message);
-        // If file was uploaded, delete it
-        if (req.file) {
-            fs.unlink(req.file.path, (err) => {
-                if (err) console.error('Error deleting uploaded file on update error:', err);
-            });
-        }
-        res.redirect(`/admin/yachts/edit/${req.params.id}`);
-    }
+    });
 });
 
 // Handle Delete Yacht
@@ -1225,11 +1277,15 @@ app.post('/admin/yachts/:id', isAuthenticated, isAdmin, async (req, res) => {
                 return res.redirect('/admin/yachts');
             }
 
-            // Before deleting the boat, delete its image if not default
-            if (yacht.imageUrl && yacht.imageUrl !== '/images/default_boat.jpg') {
-                const imagePath = path.join(__dirname, 'public', yacht.imageUrl);
-                fs.unlink(imagePath, (err) => {
-                    if (err) console.error('Error deleting yacht image:', err);
+            // Before deleting the boat, delete its images if not default
+            if (yacht.imageUrls && yacht.imageUrls.length > 0) {
+                yacht.imageUrls.forEach(imageUrl => {
+                    if (imageUrl && imageUrl !== '/images/default_boat.jpg') {
+                        const imagePath = path.join(__dirname, 'public', imageUrl);
+                        fs.unlink(imagePath, (err) => {
+                            if (err) console.error('Error deleting yacht image:', err);
+                        });
+                    }
                 });
             }
 
