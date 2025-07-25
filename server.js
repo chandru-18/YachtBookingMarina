@@ -166,13 +166,21 @@ const upload = multer({
     }
 });
 
+// IMPORTANT: Trust the Render proxy headers for secure cookies and correct protocol
+app.set('trust proxy', 1);
 
 app.use(session({
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
-    cookie: { maxAge: 86400000, httpOnly: true, secure: process.env.NODE_ENV === 'production' }
+    cookie: {
+        maxAge: 86400000, // 24 hours
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production', // Use secure cookies in production (HTTPS)
+        sameSite: 'Lax', // Protects against CSRF attacks. 'None' if cross-site iframes are involved, but 'Lax' is good for direct navigation
+        // domain: process.env.NODE_ENV === 'production' ? '.onrender.com' : 'localhost' // Generally not needed if secure/sameSite are correct
+    }
 }));
 app.use(flash());
 
@@ -267,11 +275,16 @@ const transporter = nodemailer.createTransport({
 
 // ===== Auth Middleware (MODIFIED for Passport.js) =====
 const isAuthenticated = (req, res, next) => {
-    // Passport adds req.isAuthenticated() and req.user
+    console.log('--- isAuthenticated Middleware Check ---'); // LOG 11
+    console.log('req.isAuthenticated() result:', req.isAuthenticated()); // LOG 12
+    if (req.user) {
+        console.log('req.user (in isAuthenticated):', req.user.email); // LOG 13
+    } else {
+        console.log('req.user is undefined in isAuthenticated.');
+    }
+
     if (req.isAuthenticated()) {
-        // If user is authenticated via Passport, ensure session.user is populated for backward compatibility
-        // or just rely on req.user going forward.
-        if (!req.session.user) {
+        if (!req.session.user) { // This part might be redundant if relying purely on Passport's req.user
             req.session.user = {
                 id: req.user._id,
                 name: req.user.name,
@@ -279,14 +292,17 @@ const isAuthenticated = (req, res, next) => {
                 isAdmin: req.user.isAdmin,
                 isVerified: req.user.isVerified
             };
+            console.log('req.session.user populated in isAuthenticated.'); // LOG 14
         }
         // Admins bypass email verification
         if (!req.user.isVerified && !req.user.isAdmin && req.path !== '/verify-email' && req.path !== '/resend-verification' && req.path !== '/logout' && req.path.indexOf('/verify/') === -1 && req.path.indexOf('/auth/google') === -1) {
+            console.log('User not verified, redirecting to /verify-email'); // LOG 15
             req.flash('error', 'Please verify your email to access this feature.');
             return res.redirect('/verify-email');
         }
         return next();
     }
+    console.log('isAuthenticated FAILED: Redirecting to /login'); // LOG 16
     req.flash('error', 'Please log in to access this page.');
     res.redirect('/login');
 };
@@ -679,6 +695,8 @@ app.post('/reset-password/:token', async (req, res) => {
 
 // User Dashboard
 app.get('/dashboard', isAuthenticated, async (req, res) => {
+    console.log('--- DASHBOARD ROUTE ACCESSED ---'); // LOG 17
+    console.log('User on Dashboard route:', req.user ? req.user.email : 'No user (should not happen)'); // LOG 18
     try {
         const bookings = await Booking.find({ user: req.user._id }).populate('boat').sort({ bookingDate: 1, startTime: 1 });
         res.render('dashboard', {
