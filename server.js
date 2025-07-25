@@ -4,15 +4,15 @@ const mongoose = require('mongoose');
 const path = require('path');
 const session = require('express-session');
 const MongoStore = require('connect-mongo');
-const flash = require('express-flash'); // MODIFIED: Changed from connect-flash to express-flash
+const flash = require('express-flash');
 const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 const methodOverride = require('method-override');
 const multer = require('multer');
 const fs = require('fs');
-const passport = require('passport'); // NEW: Added Passport.js
-const GoogleStrategy = require('passport-google-oauth20').Strategy; // NEW: Added Google Strategy
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -98,15 +98,6 @@ bookingSchema.pre('save', function (next) {
 const Booking = mongoose.model('Booking', bookingSchema);
 
 // ===== MongoDB Connection & Default Boats ======
-// Note: This mongoose.connect block is redundant if it's already at the top.
-// Keep only one mongoose.connect call.
-// mongoose.connect(process.env.MONGO_URI)
-//     .then(() => {
-//         console.log('MongoDB connected successfully');
-//         syncDefaultBoats(); // Ensure this is called only once on startup
-//     })
-//     .catch(err => console.error('MongoDB connection error:', err));
-
 async function syncDefaultBoats() {
     const defaultBoats = [
         { name: "ORYX 46 ft", display: "ORYX 46 ft", maxPersons: 15, pricePerHour: 500, imageUrl: "/images/oryx_46ft.jpg", description: "A luxurious and spacious yacht, perfect for larger groups." },
@@ -406,37 +397,49 @@ app.post('/register', async (req, res) => {
     }
 });
 
-// Login/Logout (MODIFIED for Passport.js)
-app.get('/login', (req, res) => res.render('login', { pageTitle: 'Login' })); // FIX APPLIED HERE
+// Login/Logout
+app.get('/login', (req, res) => res.render('login', { pageTitle: 'Login' }));
 
-// Standard login using Passport's local strategy (if you implement it, otherwise this remains as is for now)
+// Handle Email/Password Login
 app.post('/login', async (req, res, next) => {
-    // This part should be updated to use passport.authenticate('local', ...) if you have a local strategy
-    // For now, it's manually checking credentials.
     try {
         const { email, password } = req.body;
+        console.log('--- LOGIN ATTEMPT ---'); // LOG 1
+        console.log('Attempting login for email:', email);
+
         const user = await User.findOne({ email });
 
-        if (!user || !(user.password && await bcrypt.compare(password, user.password))) {
+        if (!user) {
+            console.log('Login FAILED: User not found for email:', email); // LOG 2
             req.flash('error', 'Invalid email or password.');
             return res.redirect('/login');
         }
+
+        console.log('User found:', user.email, 'IsVerified:', user.isVerified, 'Has Password:', !!user.password); // LOG 3
+        if (!user.password || !(await bcrypt.compare(password, user.password))) {
+            console.log('Login FAILED: Incorrect password or no password set for user:', user.email); // LOG 4
+            req.flash('error', 'Invalid email or password.');
+            return res.redirect('/login');
+        }
+
         if (!user.isVerified && !user.isAdmin) {
+            console.log('Login FAILED: Email not verified for user:', user.email); // LOG 5
             req.flash('error', 'Your email is not verified. Please check your inbox or resend the verification email.');
             return res.redirect('/verify-email');
         }
 
         req.login(user, (err) => {
             if (err) {
-                console.error('Passport login error:', err);
+                console.error('Passport req.login ERROR:', err); // LOG 6 (Critical Passport error during session creation)
                 req.flash('error', 'An error occurred during login.');
                 return res.redirect('/login');
             }
+            console.log('Login SUCCESSFUL for user:', user.email); // LOG 7
             req.flash('success', 'Logged in successfully!');
             res.redirect('/dashboard');
         });
     } catch (error) {
-        console.error('Login error:', error);
+        console.error('General Login ERROR in app.post(/login):', error); // LOG 8 (Any unexpected server error)
         req.flash('error', 'An error occurred during login.');
         res.redirect('/login');
     }
@@ -461,19 +464,31 @@ app.get('/logout', (req, res, next) => {
 });
 
 
-// NEW: Google OAuth Routes
+// Google OAuth Routes
 app.get('/auth/google',
     passport.authenticate('google', { scope: ['profile', 'email'] })
 );
 
 app.get('/auth/google/callback',
+    (req, res, next) => { // Add this middleware to log before Passport processes
+        console.log('--- GOOGLE CALLBACK INITIATED ---'); // LOG for Google Callback entry
+        console.log('Headers:', req.headers); // See what headers are coming in
+        console.log('Query:', req.query); // See if Google sent 'code' or 'error' in query
+        next(); // Pass control to Passport.authenticate
+    },
     passport.authenticate('google', {
         failureRedirect: '/login',
         failureFlash: true
     }),
     (req, res) => {
+        console.log('Google Login SUCCESSFUL for user:', req.user.email); // LOG 9
         req.flash('success', 'Logged in successfully with Google!');
         res.redirect('/dashboard');
+    },
+    (err, req, res, next) => { // This is an error handling middleware for Passport failure
+        console.error('Google Login FAILED via Passport strategy:', err); // LOG 10 (Critical Passport strategy error)
+        req.flash('error', 'Google login failed. Please try again.');
+        res.redirect('/login');
     }
 );
 
