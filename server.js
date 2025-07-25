@@ -1,5 +1,4 @@
-require('dotenv').config(); // MUST BE AT THE VERY TOP to load environment variables [cite: 57, 66]
-
+require('dotenv').config(); // MUST BE AT THE VERY TOP to load environment variables
 const express = require('express');
 const mongoose = require('mongoose');
 const path = require('path');
@@ -19,7 +18,10 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ====== MongoDB Connection =======
-mongoose.connect(process.env.MONGO_URI)
+mongoose.connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+})
     .then(() => {
         console.log('MongoDB connected successfully');
         syncDefaultBoats();
@@ -32,7 +34,7 @@ mongoose.connect(process.env.MONGO_URI)
 const userSchema = new mongoose.Schema({
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    password: { type: String }, // MODIFIED: password is NOT required for Google-only users 
+    password: { type: String }, // MODIFIED: password is NOT required for Google-only users
     isAdmin: { type: Boolean, default: false },
     isVerified: { type: Boolean, default: false },
     verificationToken: String,
@@ -43,7 +45,7 @@ const userSchema = new mongoose.Schema({
 });
 
 // Hash password before saving
-userSchema.pre('save', async function(next) {
+userSchema.pre('save', async function (next) {
     if (this.isModified('password') && this.password) { // Only hash if password is set and modified
         this.password = await bcrypt.hash(this.password, 10);
     }
@@ -78,7 +80,7 @@ const bookingSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
-bookingSchema.pre('save', function(next) {
+bookingSchema.pre('save', function (next) {
     if (this.isModified('phoneNumber')) {
         let cleaned = this.phoneNumber.replace(/\D/g, '');
         // Basic formatting for India (+91) if 10 digits and no leading +
@@ -96,12 +98,14 @@ bookingSchema.pre('save', function(next) {
 const Booking = mongoose.model('Booking', bookingSchema);
 
 // ===== MongoDB Connection & Default Boats ======
-mongoose.connect(process.env.MONGO_URI)
-    .then(() => {
-        console.log('MongoDB connected successfully');
-        syncDefaultBoats(); // Ensure this is called only once on startup
-    })
-    .catch(err => console.error('MongoDB connection error:', err));
+// Note: This mongoose.connect block is redundant if it's already at the top.
+// Keep only one mongoose.connect call.
+// mongoose.connect(process.env.MONGO_URI)
+//     .then(() => {
+//         console.log('MongoDB connected successfully');
+//         syncDefaultBoats(); // Ensure this is called only once on startup
+//     })
+//     .catch(err => console.error('MongoDB connection error:', err));
 
 async function syncDefaultBoats() {
     const defaultBoats = [
@@ -176,8 +180,8 @@ app.use(session({
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }), // Ensure MONGO_URI is correct [cite: 89, 90]
-    cookie: { maxAge: 86400000, httpOnly: true, secure: process.env.NODE_ENV === 'production' } // 24 hours [cite: 73]
+    store: MongoStore.create({ mongoUrl: process.env.MONGO_URI }),
+    cookie: { maxAge: 86400000, httpOnly: true, secure: process.env.NODE_ENV === 'production' }
 }));
 app.use(flash());
 
@@ -206,48 +210,48 @@ passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     callbackURL: process.env.NODE_ENV === 'production' ?
-                 "https://yachtmarinabooking.onrender.com/auth/google/callback" :
-                 "http://localhost:3000/auth/google/callback",
+        `https://${process.env.RENDER_EXTERNAL_HOSTNAME}/auth/google/callback` :
+        "http://localhost:3000/auth/google/callback",
     scope: ['profile', 'email'] // Request access to profile and email
 },
-async (accessToken, refreshToken, profile, done) => {
-    try {
-        let user = await User.findOne({ googleId: profile.id });
-
-        if (user) {
-            // User already exists, update their profile if necessary (e.g., name, email)
-            if (user.email !== profile.emails[0].value) {
-                user.email = profile.emails[0].value;
-                await user.save();
-            }
-            return done(null, user);
-        } else {
-            // Check if a user with this email already exists but without a Google ID
-            user = await User.findOne({ email: profile.emails[0].value });
+    async (accessToken, refreshToken, profile, done) => {
+        try {
+            let user = await User.findOne({ googleId: profile.id });
 
             if (user) {
-                // Link existing account with Google ID
-                user.googleId = profile.id;
-                user.isVerified = true; // Google accounts are implicitly verified
-                await user.save();
+                // User already exists, update their profile if necessary (e.g., name, email)
+                if (user.email !== profile.emails[0].value) {
+                    user.email = profile.emails[0].value;
+                    await user.save();
+                }
                 return done(null, user);
             } else {
-                // New user via Google
-                const newUser = new User({
-                    googleId: profile.id,
-                    name: profile.displayName,
-                    email: profile.emails[0].value,
-                    isVerified: true // Google accounts are implicitly verified
-                    // No password field set for Google-only users
-                });
-                await newUser.save();
-                return done(null, newUser);
+                // Check if a user with this email already exists but without a Google ID
+                user = await User.findOne({ email: profile.emails[0].value });
+
+                if (user) {
+                    // Link existing account with Google ID
+                    user.googleId = profile.id;
+                    user.isVerified = true; // Google accounts are implicitly verified
+                    await user.save();
+                    return done(null, user);
+                } else {
+                    // New user via Google
+                    const newUser = new User({
+                        googleId: profile.id,
+                        name: profile.displayName,
+                        email: profile.emails[0].value,
+                        isVerified: true // Google accounts are implicitly verified
+                        // No password field set for Google-only users
+                    });
+                    await newUser.save();
+                    return done(null, newUser);
+                }
             }
+        } catch (err) {
+            return done(err, null);
         }
-    } catch (err) {
-        return done(err, null);
-    }
-}));
+    }));
 
 
 // Make flash messages and user data available to all templates
@@ -375,16 +379,16 @@ app.post('/register', async (req, res) => {
         await newUser.save();
 
         // --- DYNAMIC URL for Verification ---
-        const verificationUrl = process.env.NODE_ENV === 'production' ?
-                                `${req.protocol}://${req.get('host')}/verify/${verificationToken}` :
-                                `http://localhost:${PORT}/verify/${verificationToken}`;
+        const protocol = process.env.NODE_ENV === 'production' ? 'https' : req.protocol;
+        const host = process.env.NODE_ENV === 'production' ? process.env.RENDER_EXTERNAL_HOSTNAME : `${req.hostname}:${PORT}`;
+        const verificationUrl = `${protocol}://${host}/verify/${verificationToken}`;
         // --- END DYNAMIC URL ---
 
         transporter.sendMail({
             to: newUser.email,
             from: process.env.EMAIL_USER,
             subject: 'Yacht Marina Booking - Email Verification',
-            html: `<p>Thank you for registering! Please click <a href="${verificationUrl}">here</a> to verify your email. This link will expire in 1 hour.</p>`
+            html: `<p>Thank you for registering! Please click <a href="${verificationUrl}">${verificationUrl}</a> to verify your email. This link will expire in 1 hour.</p>`
         }, (error, info) => {
             if (error) {
                 console.error("Error sending registration email:", error);
@@ -403,27 +407,25 @@ app.post('/register', async (req, res) => {
 });
 
 // Login/Logout (MODIFIED for Passport.js)
-app.get('/login', (req, res) => res.render('login'));
+app.get('/login', (req, res) => res.render('login', { pageTitle: 'Login' })); // FIX APPLIED HERE
 
 // Standard login using Passport's local strategy (if you implement it, otherwise this remains as is for now)
 app.post('/login', async (req, res, next) => {
-    // Note: If you implement a 'local' strategy with Passport, this section would change
-    // to `passport.authenticate('local', { ... })`. For now, it remains as direct check.
+    // This part should be updated to use passport.authenticate('local', ...) if you have a local strategy
+    // For now, it's manually checking credentials.
     try {
         const { email, password } = req.body;
         const user = await User.findOne({ email });
 
-        if (!user || !(user.password && await bcrypt.compare(password, user.password))) { // Check if user has a password before comparing
+        if (!user || !(user.password && await bcrypt.compare(password, user.password))) {
             req.flash('error', 'Invalid email or password.');
             return res.redirect('/login');
         }
-        // Only non-admin users need to verify email
         if (!user.isVerified && !user.isAdmin) {
             req.flash('error', 'Your email is not verified. Please check your inbox or resend the verification email.');
             return res.redirect('/verify-email');
         }
 
-        // Manually log in the user via Passport if successful with traditional login
         req.login(user, (err) => {
             if (err) {
                 console.error('Passport login error:', err);
@@ -442,13 +444,12 @@ app.post('/login', async (req, res, next) => {
 
 
 app.get('/logout', (req, res, next) => {
-    // MODIFIED: Use Passport's req.logout()
-    req.logout((err) => { // Passport's logout function
+    req.logout((err) => {
         if (err) {
             console.error('Error logging out:', err);
             return next(err);
         }
-        req.session.destroy(err => { // Destroy session after Passport logout
+        req.session.destroy(err => {
             if (err) {
                 console.error('Error destroying session:', err);
             }
@@ -468,10 +469,9 @@ app.get('/auth/google',
 app.get('/auth/google/callback',
     passport.authenticate('google', {
         failureRedirect: '/login',
-        failureFlash: true // Display flash messages on failure
+        failureFlash: true
     }),
     (req, res) => {
-        // Successful authentication, redirect home or dashboard.
         req.flash('success', 'Logged in successfully with Google!');
         res.redirect('/dashboard');
     }
@@ -480,7 +480,7 @@ app.get('/auth/google/callback',
 
 // Email Verification Routes
 app.get('/verify-email', isAuthenticated, (req, res) => {
-    res.render('verify-email', { user: req.user }); // MODIFIED: Use req.user
+    res.render('verify-email', { user: req.user });
 });
 
 app.get('/verify/:token', async (req, res) => {
@@ -511,7 +511,7 @@ app.get('/verify/:token', async (req, res) => {
 
 app.post('/resend-verification', async (req, res) => {
     try {
-        const emailToResend = req.user ? req.user.email : req.body.email; // MODIFIED: Use req.user
+        const emailToResend = req.user ? req.user.email : req.body.email;
 
         if (!emailToResend) {
             req.flash('error', 'No email provided for resending verification.');
@@ -535,16 +535,16 @@ app.post('/resend-verification', async (req, res) => {
         await user.save();
 
         // --- DYNAMIC URL for Resend Verification ---
-        const verificationUrl = process.env.NODE_ENV === 'production' ?
-                                `${req.protocol}://${req.get('host')}/verify/${newVerificationToken}` :
-                                `http://localhost:${PORT}/verify/${newVerificationToken}`;
+        const protocol = process.env.NODE_ENV === 'production' ? 'https' : req.protocol;
+        const host = process.env.NODE_ENV === 'production' ? process.env.RENDER_EXTERNAL_HOSTNAME : `${req.hostname}:${PORT}`;
+        const verificationUrl = `${protocol}://${host}/verify/${newVerificationToken}`;
         // --- END DYNAMIC URL ---
 
         transporter.sendMail({
             to: user.email,
             from: process.env.EMAIL_USER,
             subject: 'Yacht Marina Booking - Resend Email Verification',
-            html: `<p>We received a request to resend your verification link. Please click <a href="${verificationUrl}">here</a> to verify your email. This link will expire in 1 hour.</p>`
+            html: `<p>We received a request to resend your verification link. Please click <a href="${verificationUrl}">${verificationUrl}</a> to verify your email. This link will expire in 1 hour.</p>`
         }, (error, info) => {
             if (error) {
                 console.error("Error resending verification email:", error);
@@ -578,9 +578,9 @@ app.post('/forgot', async (req, res) => {
         await user.save();
 
         // --- DYNAMIC URL for Reset Password ---
-        const resetUrl = process.env.NODE_ENV === 'production' ?
-                         `${req.protocol}://${req.get('host')}/reset-password/${resetToken}` :
-                         `http://localhost:${PORT}/reset-password/${resetToken}`;
+        const protocol = process.env.NODE_ENV === 'production' ? 'https' : req.protocol;
+        const host = process.env.NODE_ENV === 'production' ? process.env.RENDER_EXTERNAL_HOSTNAME : `${req.hostname}:${PORT}`;
+        const resetUrl = `${protocol}://${host}/reset-password/${resetToken}`;
         // --- END DYNAMIC URL ---
 
         transporter.sendMail({
@@ -665,10 +665,9 @@ app.post('/reset-password/:token', async (req, res) => {
 // User Dashboard
 app.get('/dashboard', isAuthenticated, async (req, res) => {
     try {
-        // MODIFIED: Use req.user._id
         const bookings = await Booking.find({ user: req.user._id }).populate('boat').sort({ bookingDate: 1, startTime: 1 });
         res.render('dashboard', {
-            user: req.user, // MODIFIED: Use req.user
+            user: req.user,
             bookings: bookings
         });
     } catch (err) {
@@ -716,7 +715,7 @@ app.post('/book', isAuthenticated, async (req, res) => {
 
         const parsedBookingDate = new Date(bookingDate);
         const today = new Date();
-        today.setHours(0,0,0,0);
+        today.setHours(0, 0, 0, 0);
 
         if (isNaN(parsedBookingDate.getTime()) || parsedBookingDate < today) {
             req.flash('error', 'Please select a valid future date.');
@@ -734,8 +733,8 @@ app.post('/book', isAuthenticated, async (req, res) => {
         const endHour = parseInt(endTime.split(':')[0]);
 
         if (startHour < 9 || startHour > 20 || endHour < 9 || endHour > 21 || (endHour === 21 && parseInt(endTime.split(':')[1]) > 0)) {
-             req.flash('error', 'Booking times must be between 09:00 and 21:00.');
-             return res.redirect(`/book/${boatId}`);
+            req.flash('error', 'Booking times must be between 09:00 and 21:00.');
+            return res.redirect(`/book/${boatId}`);
         }
 
 
@@ -765,8 +764,8 @@ app.post('/book', isAuthenticated, async (req, res) => {
         // --- END DEBUG LOGS FOR TOTALPRICE ---
 
         if (durationHours <= 0) { // Should be caught by startMinutes >= endMinutes, but good safeguard
-             req.flash('error', 'Booking duration must be at least 1 hour.'); // Or adjust minimum duration
-             return res.redirect(`/book/${boatId}`);
+            req.flash('error', 'Booking duration must be at least 1 hour.'); // Or adjust minimum duration
+            return res.redirect(`/book/${boatId}`);
         }
 
         if (numberOfPersons < 1 || numberOfPersons > boat.maxPersons) {
@@ -797,7 +796,7 @@ app.post('/book', isAuthenticated, async (req, res) => {
         }
 
         const newBooking = new Booking({
-            user: req.user._id, // MODIFIED: Use req.user._id
+            user: req.user._id,
             boat: boatId,
             bookingDate: parsedBookingDate,
             startTime,
@@ -821,7 +820,7 @@ app.post('/book', isAuthenticated, async (req, res) => {
 // User's All Bookings
 app.get('/bookings', isAuthenticated, async (req, res) => {
     try {
-        const bookings = await Booking.find({ user: req.user._id }).populate('boat').sort({ bookingDate: 1, startTime: 1 }); // MODIFIED: Use req.user._id
+        const bookings = await Booking.find({ user: req.user._id }).populate('boat').sort({ bookingDate: 1, startTime: 1 });
         res.render('user-bookings', { bookings });
     } catch (error) {
         console.error('Error loading user bookings:', error);
@@ -836,7 +835,7 @@ app.post('/bookings/:id', isAuthenticated, async (req, res) => {
         const { status } = req.body;
         const bookingId = req.params.id;
 
-        const booking = await Booking.findOne({ _id: bookingId, user: req.user._id }); // MODIFIED: Use req.user._id
+        const booking = await Booking.findOne({ _id: bookingId, user: req.user._id });
 
         if (!booking) {
             req.flash('error', 'Booking not found or you do not have permission to modify it.');
@@ -863,7 +862,7 @@ app.post('/bookings/:id', isAuthenticated, async (req, res) => {
 // Profile
 app.get('/profile', isAuthenticated, async (req, res) => {
     try {
-        const user = await User.findById(req.user._id); // MODIFIED: Use req.user._id
+        const user = await User.findById(req.user._id);
         if (!user) {
             req.flash('error', 'User profile not found. Please log in again.');
             return res.redirect('/login');
@@ -958,11 +957,11 @@ app.post('/admin/edit-booking/:id', isAuthenticated, isAdmin, async (req, res) =
             booking.numberOfPersons = numPersons;
         }
         if (phoneNumber) {
-             if (!/^\+?[0-9\s-()]{7,20}$/.test(phoneNumber)) {
-                 req.flash('error', 'Please enter a valid phone number (min 7, max 20 digits, can include +, spaces, -, ()).');
-                 return res.redirect(`/admin/edit-booking/${req.params.id}`);
-             }
-             booking.phoneNumber = phoneNumber;
+            if (!/^\+?[0-9\s-()]{7,20}$/.test(phoneNumber)) {
+                req.flash('error', 'Please enter a valid phone number (min 7, max 20 digits, can include +, spaces, -, ()).');
+                return res.redirect(`/admin/edit-booking/${req.params.id}`);
+            }
+            booking.phoneNumber = phoneNumber;
         }
         if (status) {
             const validStatuses = ['pending', 'confirmed', 'cancelled', 'completed'];
