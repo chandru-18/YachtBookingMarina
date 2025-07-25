@@ -468,12 +468,14 @@ app.get('/logout', (req, res, next) => {
             console.error('Error logging out:', err);
             return next(err);
         }
+        // MODIFIED: Set the flash message *before* destroying the session
+        req.flash('success', 'You have been logged out successfully.');
+
         req.session.destroy(err => {
             if (err) {
                 console.error('Error destroying session:', err);
             }
             res.clearCookie('connect.sid');
-            req.flash('success', 'You have been logged out successfully.');
             res.redirect('/login');
         });
     });
@@ -634,10 +636,10 @@ app.post('/forgot', async (req, res) => {
         req.flash('success', 'A password reset link has been sent to your email.');
         res.redirect('/forgot');
     } catch (error) {
-        console.error('Error sending reset email:', error);
-        req.flash('error', 'Could not send reset email. Please try again.');
-        res.redirect('/forgot');
-    }
+            console.error('Error sending reset email:', error);
+            req.flash('error', 'Could not send reset email. Please try again.');
+            res.redirect('/forgot');
+        }
 });
 
 app.get('/reset-password/:token', async (req, res) => {
