@@ -1,10 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <%- include('partials/head') %> <%-- This will now correctly load CSS --%>
-    <title><%= pageTitle || 'User Dashboard' %></title>
+    <%- include('partials/head') %>
+    <title><%= pageTitle %></title>
     <style>
-        /* Your inline styles are fine here, or move them to style.css */
         .dashboard-container {
             margin-top: 2rem;
         }
@@ -26,12 +25,26 @@
     </style>
 </head>
 <body>
-    <%- include('partials/navbar') %> <%-- Correctly includes the navigation bar here --%>
+    <%- include('partials/navbar') %>
 
     <div class="container dashboard-container">
         <h1 class="mb-4">Welcome, <%= user.name %>!</h1>
 
-        <%- include('partials/flash_messages') %> <%-- Use this for all flash messages --%>
+        <% if (messages.error && messages.error.length > 0) { %>
+            <div class="alert alert-danger" role="alert">
+                <%= messages.error[0] %>
+            </div>
+        <% } %>
+        <% if (messages.success && messages.success.length > 0) { %>
+            <div class="alert alert-success" role="alert">
+                <%= messages.success[0] %>
+            </div>
+        <% } %>
+        <% if (messages.info && messages.info.length > 0) { %>
+            <div class="alert alert-info" role="alert">
+                <%= messages.info[0] %>
+            </div>
+        <% } %>
 
         <div class="row">
             <div class="col-md-6 mb-4">
@@ -78,8 +91,10 @@
         <%
             const now = new Date();
             const upcomingBookings = bookings.filter(b => {
+                // ADDED CHECK: Ensure b.bookingDate is not null or undefined
                 if (!b.bookingDate) {
-                    return false;
+                    // console.warn('Booking without bookingDate found:', b._id); // Uncomment for debugging if needed
+                    return false; // Exclude this booking if date is missing
                 }
                 const bookingDateTime = new Date(`${b.bookingDate.toISOString().split('T')[0]}T${b.startTime}:00`);
                 return bookingDateTime >= now;
@@ -117,6 +132,7 @@
         <h3 style="margin-top: 3rem;">Past Bookings</h3>
         <%
             const pastBookings = bookings.filter(b => {
+                // ADDED CHECK: Ensure b.bookingDate is not null or undefined
                 if (!b.bookingDate) {
                     return false; // Exclude this booking if date is missing
                 }
