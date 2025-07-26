@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <%- include('partials/head') %>
-    <title><%= pageTitle || 'Login' %></title>
+    <title><%= pageTitle %></title>
     <style>
         body {
             background-color: #f8f9fa;
@@ -24,7 +24,21 @@
         <div class="login-container">
             <h2 class="text-center mb-4">Login</h2>
 
-            <%- include('partials/flash_messages') %> <%-- Use this for all flash messages --%>
+            <% if (messages.error && messages.error.length > 0) { %>
+                <div class="alert alert-danger" role="alert">
+                    <%= messages.error[0] %>
+                </div>
+            <% } %>
+            <% if (messages.success && messages.success.length > 0) { %>
+                <div class="alert alert-success" role="alert">
+                    <%= messages.success[0] %>
+                </div>
+            <% } %>
+            <% if (messages.info && messages.info.length > 0) { %>
+                <div class="alert alert-info" role="alert">
+                    <%= messages.info[0] %>
+                </div>
+            <% } %>
 
             <form action="/login" method="POST">
                 <div class="mb-3">
