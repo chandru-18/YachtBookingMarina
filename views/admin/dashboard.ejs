@@ -1,137 +1,188 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard</title>
-    <link rel="stylesheet" href="/css/style.css">
+    <%- include('../partials/head') %> <%-- Correct path for partials/head.ejs --%>
+    <title><%= pageTitle || 'Admin Dashboard' %></title>
+    <style>
+        /* Admin dashboard specific styles */
+        .admin-dashboard-container {
+            margin-top: 2rem;
+        }
+        .section-divider {
+            border-bottom: 1px solid #eee;
+            padding-bottom: 1rem;
+            margin-bottom: 1rem;
+        }
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        .admin-table th, .admin-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .admin-table th {
+            background-color: #f2f2f2;
+        }
+        .btn-action {
+            margin-right: 5px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: .25em .4em;
+            font-size: 75%;
+            font-weight: 700;
+            line-height: 1;
+            text-align: center;
+            white-space: nowrap;
+            vertical-align: baseline;
+            border-radius: .25rem;
+        }
+        .status-pending { background-color: #ffc107; color: #000; } /* Bootstrap warning */
+        .status-confirmed { background-color: #28a745; color: #fff; } /* Bootstrap success */
+        .status-cancelled { background-color: #dc3545; color: #fff; } /* Bootstrap danger */
+        .status-completed { background-color: #0dcaf0; color: #000; } /* Bootstrap info */
+    </style>
 </head>
 <body>
-    <header>
-        <h1>Admin Dashboard</h1>
-        <p>Manage users and bookings</p>
-        <nav>
-            <ul>
-                <li><a href="">Home</a></li>
-                <li><a href="dashboard">Dashboard</a></li>
-                <li><a href="views/bookings">My Bookings</a></li>
-                <li><a href="views/profile">Profile</a></li>
-                <li><a href="views/admin/dashboard">Admin Panel</a></li>
-                <li><a href="/logout">Logout</a></li>
-            </ul>
-        </nav>
-    </header>
+    <%- include('../partials/navbar') %> <%-- Correct path for partials/navbar.ejs --%>
 
-    <main>
-        <div class="message-container">
-            <% if (messages.success && messages.success.length > 0) { %>
-                <div class="message success"><%= messages.success[0] %></div>
-            <% } %>
-            <% if (messages.error && messages.error.length > 0) { %>
-                <div class="message error"><%= messages.error[0] %></div>
-            <% } %>
-        </div>
+    <div class="container admin-dashboard-container">
+        <h1 class="mb-4">Admin Dashboard</h1>
 
-        <section class="dashboard-section">
-            <h2>Admin Overview</h2>
+        <%- include('../partials/flash_messages') %> <%-- Correct path for partials/flash_messages.ejs --%>
 
-            <p><a href="/admin/yachts" class="btn btn-primary">⛵ Manage Yachts</a></p>
-
-            <div class="dashboard-widgets">
-                <div class="widget-card">
-                    <h3>Total Users</h3>
-                    <p><%= users.length %></p>
-                </div>
-                <div class="widget-card">
-                    <h3>Total Bookings</h3>
-                    <p><%= bookings.length %></p>
-                </div>
-                <div class="widget-card">
-                    <h3>Pending Bookings</h3>
-                    <p><%= bookings.filter(b => b.status === 'pending').length %></p>
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        Admin Overview
+                    </div>
+                    <div class="card-body">
+                        <div class="dashboard-widgets row">
+                            <div class="widget-card col-md-4 mb-3">
+                                <div class="card text-center bg-light">
+                                    <div class="card-body">
+                                        <h3>Total Users</h3>
+                                        <p class="fs-4"><%= users.length %></p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="widget-card col-md-4 mb-3">
+                                <div class="card text-center bg-light">
+                                    <div class="card-body">
+                                        <h3>Total Bookings</h3>
+                                        <p class="fs-4"><%= bookings.length %></p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="widget-card col-md-4 mb-3">
+                                <div class="card text-center bg-light">
+                                    <div class="card-body">
+                                        <h3>Pending Bookings</h3>
+                                        <p class="fs-4"><%= bookings.filter(b => b.status === 'pending').length %></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="mt-4"><a href="/admin/yachts" class="btn btn-primary">⛵ Manage Yachts</a></p>
+                    </div>
                 </div>
             </div>
+        </div>
 
-            <h3 style="margin-top: 3rem;">All Bookings</h3>
-            <% if (bookings.length > 0) { %>
-                <div class="responsive-table">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Booking ID</th>
-                                <th>User</th>
-                                <th>Boat</th>
-                                <th>Date</th>
-                                <th>Time</th>
-                                <th>Persons</th>
-                                <th>Phone</th>
-                                <th>Total Price</th>
-                                <th>Status</th>
-                                <th>Booked At</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <% bookings.forEach(booking => { %>
-                                <tr>
-                                    <td><%= booking._id.toString().slice(-6) %></td> <td><%= booking.user ? booking.user.name : 'N/A' %></td>
-                                    <td><%= booking.boat ? (booking.boat.display || booking.boat.name) : 'N/A' %></td>
-                                    <td><%= booking.bookingDate ? booking.bookingDate.toLocaleDateString() : 'N/A' %></td>
-                                    <td><%= booking.startTime %> - <%= booking.endTime %></td>
-                                    <td><%= booking.numberOfPersons %></td>
-                                    <td><%= booking.phoneNumber %></td>
-                                    <td>د.إ <%= booking.totalPrice %></td>
-                                    <td><span class="status-badge status-<%= booking.status %>"><%= booking.status %></span></td>
-                                    <td><%= booking.createdAt ? booking.createdAt.toLocaleDateString() : 'N/A' %></td>
-                                    <td>
-                                        <a href="/admin/edit-booking/<%= booking._id %>" class="btn btn-primary btn-small">Edit</a>
-                                        <form action="/admin/bookings/<%= booking._id %>?_method=DELETE" method="POST" style="display:inline;">
-                                            <button type="submit" class="btn btn-danger btn-small" onclick="return confirm('Are you sure you want to delete this booking?');">Delete</button>
-                                        </form>
-                                    </td>
-                                </tr>
-                            <% }) %>
-                        </tbody>
-                    </table>
-                </div>
-            <% } else { %>
-                <p class="text-center">No bookings have been made yet.</p>
-            <% } %>
+        <div class="section-divider mt-4"></div>
 
-            <h3 style="margin-top: 3rem;">All Users</h3>
-            <% if (users.length > 0) { %>
-                <div class="responsive-table">
-                    <table>
-                        <thead>
+        <h3>All Bookings</h3>
+        <% if (bookings.length > 0) { %>
+            <div class="responsive-table">
+                <table class="table table-bordered table-hover admin-table">
+                    <thead>
+                        <tr>
+                            <th>Booking ID</th>
+                            <th>User</th>
+                            <th>Boat</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Persons</th>
+                            <th>Phone</th>
+                            <th>Total Price</th>
+                            <th>Status</th>
+                            <th>Booked At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% bookings.forEach(booking => { %>
                             <tr>
-                                <th>User ID</th>
-                                <th>Name</th>
-                                <th>Email</th>
-                                <th>Admin</th>
-                                <th>Verified</th>
+                                <td><%= booking._id.toString().slice(-6) %></td>
+                                <td><%= booking.user ? booking.user.name : 'N/A' %></td>
+                                <td><%= booking.boat ? (booking.boat.display || booking.boat.name) : 'N/A' %></td>
+                                <td><%= booking.bookingDate ? new Date(booking.bookingDate).toLocaleDateString() : 'N/A' %></td>
+                                <td><%= booking.startTime %> - <%= booking.endTime %></td>
+                                <td><%= booking.numberOfPersons %></td>
+                                <td><%= booking.phoneNumber %></td>
+                                <td>د.إ <%= booking.totalPrice %></td>
+                                <td><span class="status-badge status-<%= booking.status %>"><%= booking.status %></span></td>
+                                <td><%= booking.createdAt ? new Date(booking.createdAt).toLocaleDateString() : 'N/A' %></td>
+                                <td>
+                                    <a href="/admin/edit-booking/<%= booking._id %>" class="btn btn-primary btn-small btn-action">Edit</a>
+                                    <form action="/admin/bookings/<%= booking._id %>?_method=DELETE" method="POST" style="display:inline;">
+                                        <button type="submit" class="btn btn-danger btn-small btn-action" onclick="return confirm('Are you sure you want to delete this booking?');">Delete</button>
+                                    </form>
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody>
-                            <% users.forEach(user => { %>
-                                <tr>
-                                    <td><%= user._id.toString().slice(-6) %></td>
-                                    <td><%= user.name %></td>
-                                    <td><%= user.email %></td>
-                                    <td><%= user.isAdmin ? 'Yes' : 'No' %></td>
-                                    <td><%= user.isVerified ? 'Yes' : 'No' %></td>
-                                </tr>
-                            <% }) %>
-                        </tbody>
-                    </table>
-                </div>
-            <% } else { %>
-                <p class="text-center">No users registered yet.</p>
-            <% } %>
-        </section>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+        <% } else { %>
+            <p class="text-center text-muted">No bookings have been made yet.</p>
+        <% } %>
+
+        <div class="section-divider mt-4"></div>
+
+        <h3>All Users</h3>
+        <% if (users.length > 0) { %>
+            <div class="responsive-table">
+                <table class="table table-bordered table-hover admin-table">
+                    <thead>
+                        <tr>
+                            <th>User ID</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Admin</th>
+                            <th>Verified</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <% users.forEach(user => { %>
+                            <tr>
+                                <td><%= user._id.toString().slice(-6) %></td>
+                                <td><%= user.name %></td>
+                                <td><%= user.email %></td>
+                                <td><%= user.isAdmin ? 'Yes' : 'No' %></td>
+                                <td><%= user.isVerified ? 'Yes' : 'No' %></td>
+                                <td>
+                                    <a href="/admin/edit-user/<%= user._id %>" class="btn btn-warning btn-small btn-action">Edit</a>
+                                    <form action="/admin/users/<%= user._id %>?_method=DELETE" method="POST" style="display:inline;">
+                                        <button type="submit" class="btn btn-danger btn-small btn-action" onclick="return confirm('Are you sure you want to delete this user?');">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        <% }) %>
+                    </tbody>
+                </table>
+            </div>
+        <% } else { %>
+            <p class="text-center text-muted">No users registered yet.</p>
+        <% } %>
     </main>
 
-    <footer>
-        <p>&copy; <%= new Date().getFullYear() %> Yacht Marina Booking. All rights reserved.</p>
-    </footer>
+    <%- include('../partials/footer') %> <%-- Correct path for partials/footer.ejs --%>
+    <%- include('../partials/scripts') %> <%-- Correct path for partials/scripts.ejs --%>
 </body>
 </html>
