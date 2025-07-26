@@ -90,7 +90,7 @@
                             <p class="mb-0">Date: <%= new Date(booking.bookingDate).toLocaleDateString() %></p>
                             <p class="mb-0">Time: <%= booking.startTime %> - <%= booking.endTime %></p>
                             <p class="mb-0">Persons: <%= booking.numberOfPersons %></p>
-                            <p class="mb-0">Total Price: ₹<%= booking.totalPrice.toFixed(2) %></p>
+                            <p class="mb-0">Total Price: AED<%= booking.totalPrice.toFixed(2) %></p>
                             <p class="mb-0">Status: <span class="badge bg-<%= booking.status === 'confirmed' ? 'success' : (booking.status === 'pending' ? 'warning' : 'secondary') %>"><%= booking.status %></span></p>
                         </div>
                         <div>
