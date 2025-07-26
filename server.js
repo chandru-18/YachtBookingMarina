@@ -920,7 +920,16 @@ app.get('/admin/dashboard', isAuthenticated, isAdmin, async (req, res) => {
     try {
         const users = await User.find({});
         const bookings = await Booking.find({}).populate('user').populate('boat').sort({ createdAt: -1 });
-        res.render('admin/dashboard', { users, bookings });
+        const boats = await Boat.find({}); // You need to fetch boats here as well
+        
+        res.render('admin/dashboard', {
+            pageTitle: 'Admin Dashboard', // <-- Add this line
+            user: req.user,              // <-- Add this line (from isAuthenticated middleware)
+            users,
+            bookings,
+            boats,                       // <-- Add this line
+            messages: req.flash()        // <-- Add this line
+        });
     } catch (error) {
         console.error('Error loading admin dashboard:', error);
         req.flash('error', 'Could not load admin dashboard.');
