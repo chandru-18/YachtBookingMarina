@@ -95,8 +95,30 @@
 
         <div class="section-divider mt-4"></div>
 
+        <h3>Yacht Availability</h3>
+        <% if (boats && boats.length > 0) { %>
+            <form method="POST" action="/admin/update-boats" class="mb-4">
+                <ul class="list-group"> <%-- Changed from 'list-item' to 'list-group-item' --%>
+                    <% boats.forEach(boat => { %>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <%= boat.name %>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="boatSwitch_<%= boat._id %>" name="<%= boat._id %>" <%= boat.availability ? 'checked' : '' %>>
+                                <label class="form-check-label" for="boatSwitch_<%= boat._id %>"><%= boat.availability ? 'Available' : 'Unavailable' %></label>
+                            </div>
+                        </li>
+                    <% }) %>
+                </ul>
+                <button type="submit" class="btn btn-success mt-3">Update Availability</button>
+            </form>
+        <% } else { %>
+            <p class="text-muted">No yachts found to manage availability.</p>
+        <% } %>
+
+        <div class="section-divider mt-4"></div>
+
         <h3>All Bookings</h3>
-        <% if (bookings.length > 0) { %>
+        <% if (bookings && bookings.length > 0) { %>
             <div class="responsive-table">
                 <table class="table table-bordered table-hover admin-table">
                     <thead>
@@ -145,7 +167,7 @@
         <div class="section-divider mt-4"></div>
 
         <h3>All Users</h3>
-        <% if (users.length > 0) { %>
+        <% if (users && users.length > 0) { %>
             <div class="responsive-table">
                 <table class="table table-bordered table-hover admin-table">
                     <thead>
@@ -180,7 +202,7 @@
         <% } else { %>
             <p class="text-center text-muted">No users registered yet.</p>
         <% } %>
-    </main>
+    </div>
 
     <%- include('../partials/footer') %> <%-- Correct path for partials/footer.ejs --%>
     <%- include('../partials/scripts') %> <%-- Correct path for partials/scripts.ejs --%>
