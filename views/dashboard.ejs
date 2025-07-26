@@ -118,7 +118,7 @@
         <%
             const pastBookings = bookings.filter(b => {
                 if (!b.bookingDate) {
-                    return false;
+                    return false; // Exclude this booking if date is missing
                 }
                 const bookingDateTime = new Date(`${b.bookingDate.toISOString().split('T')[0]}T${b.startTime}:00`);
                 return bookingDateTime < now;
