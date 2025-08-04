@@ -15,6 +15,7 @@ const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 
 const app = express();
+app.use(express.static("public"));
 const PORT = process.env.PORT || 3000;
 
 // ====== MongoDB Connection =======
