@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const Booking = require("../models/booking"); // Adjust path if needed
+const Booking = require("../models/booking");
 const Boat = require("../models/boat");
 const nodemailer = require("nodemailer");
 
@@ -11,16 +11,20 @@ function isLoggedIn(req, res, next) {
 }
 
 router.post("/book", isLoggedIn, async (req, res) => {
+  console.log("🔥 POST /book triggered");
+
   try {
     const { boatId, bookingDate, startTime, endTime, numberOfPersons, phoneNumber } = req.body;
+    console.log("📦 Booking data received:", req.body);
 
     const boat = await Boat.findById(boatId);
     if (!boat) {
+      console.log("❌ Boat not found");
       req.flash("error", "Boat not found.");
       return res.redirect("/");
     }
 
-    // Time difference in hours
+    // Calculate total price
     const start = parseInt(startTime.split(":")[0]);
     const end = parseInt(endTime.split(":")[0]);
     const duration = end - start;
@@ -37,9 +41,10 @@ router.post("/book", isLoggedIn, async (req, res) => {
       totalPrice,
     });
 
-    await booking.save(); // ✅ Save booking
+    await booking.save();
+    console.log("✅ Booking saved. Preparing to send email...");
 
-    // ✅ Email admin after booking
+    // Email admin after booking
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
@@ -53,7 +58,7 @@ router.post("/book", isLoggedIn, async (req, res) => {
       to: process.env.EMAIL_USER, // admin
       subject: `🛥️ New Booking by ${req.user.name}`,
       text: `
-🛥️ New Booking Received
+A new yacht booking has been made!
 
 👤 Name: ${req.user.name}
 📧 Email: ${req.user.email}
@@ -68,9 +73,9 @@ router.post("/book", isLoggedIn, async (req, res) => {
 
     transporter.sendMail(mailOptions, (err, info) => {
       if (err) {
-        console.error("Email error:", err);
+        console.error("❌ Email error:", err);
       } else {
-        console.log("Email sent:", info.response);
+        console.log("✅ Email sent:", info.response);
       }
     });
 
@@ -78,7 +83,7 @@ router.post("/book", isLoggedIn, async (req, res) => {
     res.redirect("/bookings");
 
   } catch (err) {
-    console.error(err);
+    console.error("🔥 Booking Error:", err);
     req.flash("error", "Booking failed.");
     res.redirect("/");
   }
