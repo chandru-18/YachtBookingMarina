@@ -1,40 +1,87 @@
-const mongoose = require('mongoose');
+const express = require("express");
+const router = express.Router();
+const Booking = require("../models/booking"); // Adjust path if needed
+const Boat = require("../models/boat");
+const nodemailer = require("nodemailer");
 
-const bookingSchema = new mongoose.Schema({
-  boat: { type: mongoose.Schema.Types.ObjectId, ref: 'Boat', required: true },
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  bookingDate: { type: Date, required: true },
-  startTime: { type: String, required: true },
-  endTime: { type: String, required: true },
-  numberOfPersons: { type: Number, required: true },
-  phoneNumber: { type: String, required: true },
-  totalPrice: { type: Number, required: true },
-  status: {
-    type: String,
-    enum: ['pending', 'confirmed', 'cancelled', 'completed'],
-    default: 'pending'
-  },
-  createdAt: { type: Date, default: Date.now }
-});
+// Middleware to ensure user is logged in
+function isLoggedIn(req, res, next) {
+  if (req.isAuthenticated()) return next();
+  res.redirect("/login");
+}
 
+router.post("/book", isLoggedIn, async (req, res) => {
+  try {
+    const { boatId, bookingDate, startTime, endTime, numberOfPersons, phoneNumber } = req.body;
 
-bookingSchema.pre('save', function(next) {
-  let num = this.phoneNumber ? this.phoneNumber.trim() : '';
-  num = num.replace(/[\s\-()]/g, '');
-  if (num.startsWith('00')) {
-    num = '+' + num.slice(2);
-  }
-  if (!num.startsWith('+')) {
-    if (num.length === 10 && num.startsWith('0')) {
-      num = '+971' + num.slice(1); // Change to +91 for India if you want
-    } else if (num.length >= 8 && /^\d+$/.test(num)) {
-      num = '+971' + num;
-    } else {
-      num = '+' + num;
+    const boat = await Boat.findById(boatId);
+    if (!boat) {
+      req.flash("error", "Boat not found.");
+      return res.redirect("/");
     }
+
+    // Time difference in hours
+    const start = parseInt(startTime.split(":")[0]);
+    const end = parseInt(endTime.split(":")[0]);
+    const duration = end - start;
+    const totalPrice = duration * boat.price;
+
+    const booking = new Booking({
+      boat: boat._id,
+      user: req.user._id,
+      bookingDate,
+      startTime,
+      endTime,
+      numberOfPersons,
+      phoneNumber,
+      totalPrice,
+    });
+
+    await booking.save(); // ✅ Save booking
+
+    // ✅ Email admin after booking
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    const mailOptions = {
+      from: `"Yacht Booking" <${process.env.EMAIL_USER}>`,
+      to: process.env.EMAIL_USER, // admin
+      subject: `🛥️ New Booking by ${req.user.name}`,
+      text: `
+🛥️ New Booking Received
+
+👤 Name: ${req.user.name}
+📧 Email: ${req.user.email}
+📱 Phone: ${booking.phoneNumber}
+🛥️ Boat: ${boat.display || boat.name}
+📅 Date: ${booking.bookingDate}
+⏰ Time: ${booking.startTime} - ${booking.endTime}
+👥 Persons: ${booking.numberOfPersons}
+💰 Total: AED ${booking.totalPrice}
+      `,
+    };
+
+    transporter.sendMail(mailOptions, (err, info) => {
+      if (err) {
+        console.error("Email error:", err);
+      } else {
+        console.log("Email sent:", info.response);
+      }
+    });
+
+    req.flash("success", "Booking successful! Admin has been notified.");
+    res.redirect("/bookings");
+
+  } catch (err) {
+    console.error(err);
+    req.flash("error", "Booking failed.");
+    res.redirect("/");
   }
-  this.phoneNumber = num;
-  next();
 });
 
-module.exports = mongoose.model('Booking', bookingSchema);
+module.exports = router;
